@@ -3,20 +3,20 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { router, Stack } from 'expo-router';
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { LineChart } from "react-native-gifted-charts"; // Usamos la librería de tu compañero
+import { LineChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function EstadisticasScreen() {
     
-    // Datos para la gráfica de línea (simulados para que se vea como el mockup)
-    const lineData = [
-        { value: 0, label: 'Ene' },
-        { value: 20, label: 'Feb' },
-        { value: 10, label: 'Mar' },
-        { value: 28, label: 'Abr' },
-        { value: 22, label: 'May' },
-        { value: 12, label: 'Jun' },
-        { value: 22, label: 'Jul' },
+    // Datos para la gráfica pequeña (Resumen)
+    const lineDataSmall = [
+        { value: 0 }, 
+        { value: 20 }, 
+        { value: 10 }, 
+        { value: 28 }, 
+        { value: 22 }, 
+        { value: 12 }, 
+        { value: 22 }
     ];
 
     return (
@@ -96,35 +96,43 @@ export default function EstadisticasScreen() {
                     </View>
 
                     {/* --- SECCIÓN 2: VENTAS (Tarjeta Azul con Gráfica) --- */}
-                    <View style={styles.blueCard}>
+                    {/* ¡AQUÍ ESTÁ LA MAGIA! Al presionar, vamos a /ventas-por-periodo */}
+                    <TouchableOpacity 
+                        style={styles.blueCard}
+                        onPress={() => router.push('/ventas-por-periodo')} 
+                        activeOpacity={0.9}
+                    >
                         <Text style={styles.cardTitle}>{"Ventas por periodo"}</Text>
                         <View style={{ alignItems: 'center', marginTop: 10 }}>
                             <LineChart
-                                data={lineData}
+                                data={lineDataSmall}
                                 color="#2962FF"
                                 thickness={3}
-                                dataPointsColor="#2962FF"
-                                startFillColor="#2962FF"
-                                endFillColor="#2962FF"
-                                startOpacity={0}
-                                endOpacity={0}
-                                initialSpacing={10}
-                                noOfSections={4}
+                                hideDataPoints={false}
+                                noOfSections={3}
                                 yAxisColor="transparent"
                                 xAxisColor="gray"
-                                rulesColor="gray"
                                 rulesType="solid"
-                                yAxisTextStyle={{ color: 'gray', fontSize: 10 }}
-                                xAxisLabelTextStyle={{ color: 'gray', fontSize: 10 }}
-                                height={120}
+                                rulesColor="rgba(0,0,0,0.1)"
+                                height={100}
                                 width={260} // Ajustado para que quepa en la tarjeta
-                                hideDataPoints={false}
+                                pointerConfig={{
+                                    pointerStripHeight: 100,
+                                    pointerStripColor: 'lightgray',
+                                    pointerStripWidth: 2,
+                                    pointerColor: 'lightgray',
+                                    radius: 4,
+                                    pointerLabelWidth: 100,
+                                    pointerLabelHeight: 120,
+                                    activatePointersOnLongPress: true,
+                                    autoAdjustPointerLabelPosition: false,
+                                }}
                             />
                         </View>
-                    </View>
+                    </TouchableOpacity>
 
                     {/* --- SECCIÓN 3: MÉTRICAS (Tarjetas Amarillas) --- */}
-                    <Text style={[styles.cardTitle, { marginTop: 10, marginBottom: 10 }]}>
+                    <Text style={[styles.cardTitle, { marginTop: 10, marginBottom: 10, color: '#000', textAlign: 'left', marginLeft: 4 }]}>
                         {"Métricas de productividad"}
                     </Text>
 
@@ -135,7 +143,7 @@ export default function EstadisticasScreen() {
                             <Text style={styles.metricLabel}>{"Ventas del día"}</Text>
                         </View>
 
-                        <View style={{ width: 15 }} /> 
+                        <View style={{ width: 15 }} />
 
                         {/* Tarjeta Derecha */}
                         <View style={styles.yellowCard}>
@@ -184,6 +192,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10, // Menos padding horizontal para que quepa la gráfica
         marginBottom: 20,
         minHeight: 200,
+        // Sombra sutil para indicar que es botón
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
     },
     cardTitle: {
         fontSize: 11,
@@ -242,6 +256,6 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         color: "#000000",
         textAlign: 'center',
-        width: '80%', // Para que el texto se acomode en dos líneas si es necesario
+        width: '80%',
     }
 });
