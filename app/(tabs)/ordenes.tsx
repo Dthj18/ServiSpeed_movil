@@ -1,259 +1,446 @@
-import { faCalendarDays, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
+import { faCalendarDays, faClock, faFileInvoiceDollar, faInfoCircle, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { router, Stack } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+interface OrdenCard {
+    idOrden: number;
+    nombreCliente: string;
+    fecha: string;
+    productoPrincipal: string;
+    estatus: string;
+    claveEstatus: string;
+    fechaIso: string;
+    nombreEncargado: string;
+    montoTotal: number;
+    fechaEntrega: string;
+    descripcionEstatus: string;
+}
 
 export default function OrdenesScreen() {
-    
+
+    const [ordenes, setOrdenes] = useState<OrdenCard[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filtroActivo, setFiltroActivo] = useState("Todas");
+    const opcionesFiltro = ["Todas", "En curso", "Completadas", "Canceladas"];
+    const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
+    const [mostrarCalendario, setMostrarCalendario] = useState(false);
+
+    const [modalDetalleVisible, setModalDetalleVisible] = useState(false);
+    const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCard | null>(null);
+
+    useEffect(() => {
+        const fetchOrdenes = async () => {
+            try {
+                const response = await fetch('http://192.168.100.14:8082/api/ordenes/movil/tarjetas');
+                if (!response.ok) throw new Error("Error en el servidor");
+                const data = await response.json();
+                if (Array.isArray(data)) setOrdenes(data);
+                else setOrdenes([]);
+            } catch (error) {
+                console.error("Error: ", error);
+                setOrdenes([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchOrdenes();
+    }, []);
+
+    const getStatusColor = (clave: string) => {
+        if (clave.includes('ENTREGADA')) return "#7CCB64";
+        if (clave.includes('ATRASADA') || clave.includes('CANCELADA') || clave.includes('RECHAZADO')) return "#FE5F5F";
+        return "#3A88F6";
+    }
+
+    const getOrdenesFiltradas = () => {
+        return ordenes.filter((orden) => {
+            if (fechaSeleccionada) {
+                const year = fechaSeleccionada.getFullYear();
+                const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
+                const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
+                const fechaFiltroStr = `${year}-${month}-${day}`;
+                if (orden.fechaIso !== fechaFiltroStr) return false;
+            }
+            if (filtroActivo === "Todas") return true;
+            if (filtroActivo === "Completadas") return orden.claveEstatus === 'ORD_ENTREGADA';
+            if (filtroActivo === "Canceladas") return orden.claveEstatus.includes('CANCELADA') || orden.claveEstatus.includes('RECHAZADO') || orden.claveEstatus.includes('ATRASADA');
+            if (filtroActivo === "En curso") return orden.claveEstatus !== 'ORD_ENTREGADA' && !orden.claveEstatus.includes('CANCELADA') && !orden.claveEstatus.includes('RECHAZADO');
+            return true;
+        });
+    };
+
+    const listaParaMostrar = getOrdenesFiltradas();
+
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setMostrarCalendario(false);
+            if (event.type === 'set' && selectedDate) setFechaSeleccionada(selectedDate);
+            return;
+        }
+        if (selectedDate) setFechaSeleccionada(selectedDate);
+    };
+    const cerrarCalendario = () => setMostrarCalendario(false);
+    const limpiarFecha = () => setFechaSeleccionada(null);
+
+    const abrirDetalle = (orden: OrdenCard) => {
+        setOrdenSeleccionada(orden);
+        setModalDetalleVisible(true);
+    };
+
     return (
         <>
-            {/* ESTA ES LA NUEVA SECCIÓN (copiada de cotizaciones.tsx)
-              Define el header (barra superior) de esta pantalla
-            */}
             <Stack.Screen
                 options={{
                     headerShown: true,
-                    headerTitle: "Órdenes", // Título de tu pantalla
+                    headerTitle: "Órdenes",
                     headerTitleAlign: 'center',
-                    headerTitleStyle: {
-                        fontFamily: "LexendTera-SemiBold", // Fuente de tu compañero
-                        fontSize: 15,
-                    },
-                    headerStyle: {
-                        backgroundColor: '#FFFFFF',
-                    },
+                    headerTitleStyle: { fontFamily: "LexendTera-SemiBold", fontSize: 15 },
+                    headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
-
-                    headerLeft: () => (
-                        <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 20 }}>
-                            <FontAwesomeIcon icon={faChevronLeft} size={20} color="#525252" />
-                        </TouchableOpacity>
-                    ),
-
                     headerRight: () => (
-                        <TouchableOpacity onPress={() => { /* Lógica del calendario */ }} style={{ marginRight: 20 }}>
-                            <FontAwesomeIcon icon={faCalendarDays} size={20} color="#525252" />
+                        <TouchableOpacity onPress={() => setMostrarCalendario(true)} style={{ marginRight: 20 }}>
+                            <FontAwesomeIcon icon={faCalendarDays} size={20} color={fechaSeleccionada ? "#3A88F6" : "#525252"} />
                         </TouchableOpacity>
                     ),
                 }}
             />
-            
-            {/* ESTE ES EL NUEVO LAYOUT (copiado de cotizaciones.tsx)
-            */}
+
             <View style={styles.container}>
+                {fechaSeleccionada && (
+                    <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 10, alignItems: 'center', backgroundColor: '#F0F8FF' }}>
+                        <Text style={{ color: '#3A88F6', fontWeight: 'bold', marginRight: 10 }}>
+                            Filtrando por: {fechaSeleccionada.toISOString().split('T')[0]}
+                        </Text>
+                        <TouchableOpacity onPress={limpiarFecha}>
+                            <Text style={{ color: '#FF5555', fontWeight: 'bold' }}>Reestablecer</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
-                    
-                    {/* ESTE ES TU CONTENIDO (el que ya habíamos arreglado)
-                    */}
-                    <Text style={styles.titulo}>
-                        {"Filtros de Órdenes"}
-                    </Text>
+                    <Text style={styles.titulo}>{"Filtros de Órdenes"}</Text>
 
                     <View style={styles.filtrosContainer}>
-                        <Text style={styles.filtroTexto}>
-                            {"Todas"}
-                        </Text>
-                        <View style={styles.filtroSpacer} />
-                        <Text style={styles.filtroTexto}>
-                            {"En curso"}
-                        </Text>
-                        <View style={styles.filtroSpacer} />
-                        <Text style={styles.filtroTexto}>
-                            {"Completadas"}
-                        </Text>
-                        <View style={styles.filtroSpacer} />
-                        <Text style={styles.filtroTexto}>
-                            {"Atrasadas"}
-                        </Text>
-                        <View style={styles.filtroSpacer} />
-                    </View>
-                    
-                    <View style={styles.cardContainer}>
-                        <View style={[styles.cardColorBar, {backgroundColor: "#3A88F6"}]} />
-                        <View style={styles.cardContent}>
-                            <Text style={styles.cardNombre}>
-                                {"Rubén Tuesta"}
-                            </Text>
-                            <View style={styles.cardFila}>
-                                <View style={styles.cardFechaContainer}>
-                                    <Image
-                                        source = {{uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/3j9CazomhD/vqua0tr7_expires_30_days.png"}} 
-                                        resizeMode = {"stretch"}
-                                        style={styles.cardIcono}
-                                    />
-                                    <Text style={[styles.cardFechaTexto, {color: "#3B89F6"}]}>
-                                        {"Noviembre 25"}
-                                    </Text>
-                                </View>
-                                <View style={styles.filtroSpacer} />
-                                <View style={[styles.cardPill, {backgroundColor: "#3B89F6"}]}>
-                                    <Text style={styles.cardPillTexto}>
-                                        {"En curso"}
-                                    </Text>
-                                </View>
-                            </View>
-                            <Text style={styles.cardDescripcion}>
-                                {"Playera con estampado personalizado"}
-                            </Text>
-                        </View>
-                    </View>
-                    
-                    <View style={styles.cardContainer}>
-                        <View style={[styles.cardColorBar, {backgroundColor: "#7CCB64"}]} />
-                        <View style={styles.cardContent}>
-                            <Text style={styles.cardNombre}>
-                                {"Jorge Tuz"}
-                            </Text>
-                            <View style={styles.cardFila}>
-                                <View style={styles.cardFechaContainer}>
-                                    <Image
-                                        source = {{uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/3j9CazomhD/tfn6pnwf_expires_30_days.png"}} 
-                                        resizeMode = {"stretch"}
-                                        style={styles.cardIcono}
-                                    />
-                                    <Text style={[styles.cardFechaTexto, {color: "#7CCB64"}]}>
-                                        {"Septiembre 05"}
-                                    </Text>
-                                </View>
-                                <View style={styles.filtroSpacer} />
-                                <View style={[styles.cardPill, {backgroundColor: "#7CCB64"}]}>
-                                    <Text style={styles.cardPillTexto}>
-                                        {"Completado"}
-                                    </Text>
-                                </View>
-                            </View>
-                            <Text style={styles.cardDescripcion}>
-                                {"Taza color azul con frase"}
-                            </Text>
-                        </View>
-                    </View>
-                    
-                    <View style={styles.cardContainer}>
-                        <View style={[styles.cardColorBar, {backgroundColor: "#FE5F5F"}]} />
-                        <View style={styles.cardContent}>
-                            <Text style={styles.cardNombre}>
-                                {"Isaias Juarez"}
-                            </Text>
-                            <View style={styles.cardFila}>
-                                <View style={styles.cardFechaContainer}>
-                                    <Image
-                                        source = {{uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/3j9CazomhD/cu8zo97m_expires_30_days.png"}} 
-                                        resizeMode = {"stretch"}
-                                        style={styles.cardIcono}
-                                    />
-                                    <Text style={[styles.cardFechaTexto, {color: "#FE5F5F"}]}>
-                                        {"Agosto 27"}
-                                    </Text>
-                                </View>
-                                <View style={styles.filtroSpacer} />
-                                <View style={[styles.cardPill, {backgroundColor: "#FE5F5F"}]}>
-                                    <Text style={styles.cardPillTexto}>
-                                        {"Atrasada"}
-                                    </Text>
-                                </View>
-                            </View>
-                            <Text style={styles.cardDescripcion}>
-                                {"Publicidad comercial"}
-                            </Text>
-                        </View>
+                        {opcionesFiltro.map((opcion) => (
+                            <TouchableOpacity key={opcion} onPress={() => setFiltroActivo(opcion)}>
+                                <Text style={[styles.filtroTexto, filtroActivo === opcion && styles.filtroTextoActivo]}>
+                                    {opcion}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
 
+                    {loading ? (
+                        <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 20 }} />
+                    ) : (
+                        listaParaMostrar.map((item) => {
+                            const colorTema = getStatusColor(item.claveEstatus);
+
+                            return (
+                                <TouchableOpacity
+                                    key={item.idOrden}
+                                    onPress={() => abrirDetalle(item)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.cardContainer}>
+                                        <View style={[styles.cardColorBar, { backgroundColor: colorTema }]}></View>
+                                        <View style={styles.cardContent}>
+                                            <Text style={styles.cardNombre}>{item.nombreCliente}</Text>
+                                            <View style={styles.cardFila}>
+                                                <View style={styles.cardFechaContainer}>
+                                                    <Image source={{ uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/3j9CazomhD/vqua0tr7_expires_30_days.png" }} resizeMode={"stretch"} style={styles.cardIcono} />
+                                                    <Text style={[styles.cardFechaTexto, { color: colorTema }]}>{item.fecha}</Text>
+                                                </View>
+                                                <View style={styles.filtroSpacer}></View>
+                                                <View style={[styles.cardPill, { backgroundColor: colorTema }]}>
+                                                    <Text style={styles.cardPillTexto}>{item.estatus}</Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.cardDescripcion} numberOfLines={1} ellipsizeMode="tail">{item.productoPrincipal}</Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
                 </ScrollView>
+
+                {mostrarCalendario && (
+                    Platform.OS === 'ios' ? (
+                        <Modal transparent={true} animationType="fade" visible={mostrarCalendario} onRequestClose={cerrarCalendario}>
+                            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={cerrarCalendario}>
+                                <View style={styles.iosDatePickerContainer} onStartShouldSetResponder={() => true}>
+                                    <View style={styles.iosToolbar}>
+                                        <TouchableOpacity onPress={cerrarCalendario}>
+                                            <Text style={styles.iosButtonText}>Listo</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="spinner" onChange={onDateChange} textColor="#000000" themeVariant="light" />
+                                </View>
+                            </TouchableOpacity>
+                        </Modal>
+                    ) : (
+                        <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="default" onChange={onDateChange} />
+                    )
+                )}
+
+                <Modal
+                    animationType="slide"
+                    transparent={true}
+                    visible={modalDetalleVisible}
+                    onRequestClose={() => setModalDetalleVisible(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+
+                            <View style={styles.modalHeader}>
+                                <View style={[styles.cardPill, {
+                                    backgroundColor: getStatusColor(ordenSeleccionada?.claveEstatus || ""),
+                                    width: 'auto', paddingHorizontal: 15
+                                }]}>
+                                    <Text style={styles.cardPillTexto}>{ordenSeleccionada?.estatus}</Text>
+                                </View>
+
+                                <TouchableOpacity onPress={() => setModalDetalleVisible(false)}>
+                                    <FontAwesomeIcon icon={faTimes} size={22} color="#999" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text style={styles.modalTitle}>Orden #{ordenSeleccionada?.idOrden}</Text>
+
+                            <View style={styles.divider} />
+
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesomeIcon icon={faUser} size={18} color="#3A88F6" />
+                                </View>
+                                <View style={styles.detailTextContainer}>
+                                    <Text style={styles.detailLabel}>Cliente</Text>
+                                    <Text style={styles.detailValue}>{ordenSeleccionada?.nombreCliente}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesomeIcon icon={faInfoCircle} size={18} color="#3A88F6" />
+                                </View>
+                                <View style={styles.detailTextContainer}>
+                                    <Text style={styles.detailLabel}>Descripción</Text>
+                                    <Text style={styles.detailValue}>{ordenSeleccionada?.productoPrincipal}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesomeIcon icon={faUserTie} size={18} color="#3A88F6" />
+                                </View>
+                                <View style={styles.detailTextContainer}>
+                                    <Text style={styles.detailLabel}>Encargado</Text>
+                                    <Text style={styles.detailValue}>{ordenSeleccionada?.nombreEncargado}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesomeIcon icon={faClock} size={18} color="#3A88F6" />
+                                </View>
+                                <View style={styles.detailTextContainer}>
+                                    <Text style={styles.detailLabel}>Estatus Actual</Text>
+                                    <Text style={styles.detailValue}>
+                                        {ordenSeleccionada?.descripcionEstatus}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.detailRow}>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesomeIcon icon={faTruck} size={18} color="#3A88F6" />
+                                </View>
+                                <View style={styles.detailTextContainer}>
+                                    <Text style={styles.detailLabel}>Entrega Estimada</Text>
+                                    <Text style={styles.detailValue}>{ordenSeleccionada?.fechaEntrega}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.divider} />
+
+                            <View style={styles.totalRow}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <FontAwesomeIcon
+                                        icon={faFileInvoiceDollar}
+                                        size={24}
+                                        color={ordenSeleccionada?.claveEstatus?.includes('CANCELADA') ? "#FE5F5F" : "#7CCB64"}
+                                    />
+                                    <Text style={styles.totalLabel}>Total de Venta</Text>
+                                </View>
+                                <Text style={[
+                                    styles.totalValue,
+                                    ordenSeleccionada?.claveEstatus?.includes('CANCELADA') && {
+                                        textDecorationLine: 'line-through',
+                                        color: '#FE5F5F',
+                                        textDecorationStyle: 'solid'
+                                    }
+                                ]}>
+                                    ${ordenSeleccionada?.montoTotal?.toFixed(2)}
+                                </Text>
+                            </View>
+
+                            <TouchableOpacity
+                                style={styles.closeButtonFull}
+                                onPress={() => setModalDetalleVisible(false)}
+                            >
+                                <Text style={styles.closeButtonText}>Cerrar</Text>
+                            </TouchableOpacity>
+
+                        </View>
+                    </View>
+                </Modal>
             </View>
         </>
     );
 }
 
 const styles = StyleSheet.create({
-    // --- ESTILOS DEL LAYOUT (de cotizaciones.tsx) ---
-    container: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-    scrollContainer: {
-        flexGrow: 1,
-        paddingTop: 20,
-        paddingHorizontal: 20,
-        paddingBottom:100,
-    },
-    // --- ESTILOS DE ORDENES (actualizados) ---
-    titulo: {
-        fontSize: 12, // Igual que cotizaciones
-        fontWeight: "bold",
-        fontFamily: "LexendTera-SemiBold", // Fuente de tu compañero
-        marginBottom: 14,
-        alignSelf: 'flex-start', // Igual que cotizaciones
-    },
+    container: { flex: 1, backgroundColor: "#F5F5F5" },
+    scrollContainer: { padding: 20 },
+    titulo: { fontSize: 18, fontWeight: "bold", marginBottom: 15, color: "#333" },
+
     filtrosContainer: {
-        flexDirection: "row",
-        backgroundColor: "#FFFFFF",
-        borderColor: "#00000070",
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#FFFFFF', borderRadius: 25, borderWidth: 1, borderColor: '#E0E0E0', marginBottom: 20, width: '100%',
+    },
+    filtroTexto: { fontSize: 13, color: '#9E9E9E' },
+    filtroTextoActivo: { color: '#3A88F6', fontWeight: 'bold' },
+    filtroSpacer: { width: 10 },
+
+    cardContainer: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 16, height: 110, overflow: 'hidden', elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+    cardColorBar: { width: 8, height: '100%' },
+    cardContent: { flex: 1, padding: 12, justifyContent: 'space-between' },
+    cardNombre: { fontSize: 16, fontWeight: 'bold', color: '#000' },
+    cardFila: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    cardFechaContainer: { flexDirection: 'row', alignItems: 'center' },
+    cardIcono: { width: 14, height: 14, marginRight: 6 },
+    cardFechaTexto: { fontSize: 12, fontWeight: '500' },
+    cardPill: { width: 100, paddingVertical: 4, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+    cardPillTexto: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
+    cardDescripcion: { fontSize: 12, color: '#666' },
+
+    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }, // Oscuro para modal
+    iosDatePickerContainer: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 20 },
+    iosToolbar: { flexDirection: 'row', justifyContent: 'flex-end', padding: 15, borderBottomWidth: 1, borderBottomColor: '#E0E0E0', backgroundColor: '#F8F8F8', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+    iosButtonText: { color: '#3A88F6', fontSize: 16, fontWeight: 'bold' },
+
+    modalContent: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        padding: 25,
+        paddingBottom: 40,
+        minHeight: 400,
+    },
+    closeButton: {
+        alignSelf: 'flex-end',
+        padding: 5,
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#333',
+        textAlign: 'center',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#999',
+        textAlign: 'center',
+        marginBottom: 15,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#EEE',
+        marginVertical: 15,
+    },
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    detailLabel: {
+        fontSize: 12,
+        color: '#999',
+        marginBottom: 2,
+    },
+    detailValue: {
+        fontSize: 16,
+        color: '#333',
+        fontWeight: '500',
+    },
+    detailFooter: {
+        textAlign: 'center',
+        color: '#AAA',
+        fontSize: 12,
+        marginBottom: 20,
+    },
+    actionButton: {
+        padding: 15,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    actionButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    // ...
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
         borderRadius: 20,
-        borderWidth: 1,
-        paddingVertical: 12,
-        paddingHorizontal: 23, 
-        marginBottom: 24,
+        backgroundColor: '#F0F8FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
     },
-    filtroTexto: {
-        color: "#000000",
-        fontSize: 12,
+    detailTextContainer: {
+        flex: 1,
+        justifyContent: 'center',
     },
-    filtroSpacer: {
-        flex: 1, 
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F9F9F9',
+        padding: 15,
+        borderRadius: 12,
+        marginBottom: 20,
     },
-    cardContainer: {
-        flexDirection: "row",        
-        backgroundColor: "#E4E4E485",
-        borderRadius: 21,
-        marginBottom: 15,            
-        overflow: "hidden",          
+    totalLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#555',
+        marginLeft: 10,
     },
-    cardColorBar: {
-        width: 22,
+    totalValue: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#7CCB64',
     },
-    cardContent: {
-        flex: 1,                     
-        paddingTop: 13,
-        paddingBottom: 18,
-        paddingLeft: 15,             
-        paddingRight: 21,
+    closeButtonFull: {
+        backgroundColor: '#F0F0F0',
+        padding: 15,
+        borderRadius: 12,
+        alignItems: 'center',
     },
-    cardNombre: {
-        color: "#000000",
-        fontSize: 15,
-        fontWeight: "bold",
-        marginBottom: 8,
-        // ¡Fuente especial ELIMINADA! Ahora usa la fuente default.
+    closeButtonText: {
+        color: '#555',
+        fontWeight: 'bold',
+        fontSize: 16,
     },
-    cardFila: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 6,
-    },
-    cardFechaContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    cardIcono: {
-        width: 16,
-        height: 16,
-        marginRight: 3, 
-    },
-    cardFechaTexto: {
-        fontSize: 9,
-    },
-    cardPill: {
-        borderRadius: 30,
-        paddingVertical: 6,
-        paddingHorizontal: 16,
-    },
-    cardPillTexto: {
-        color: "#FFFFFF",
-        fontSize: 12,
-    },
-    cardDescripcion: {
-        color: "#000000",
-        fontSize: 8,
-        width: "80%",
-    }
 });
