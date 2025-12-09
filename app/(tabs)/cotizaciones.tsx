@@ -1,8 +1,20 @@
-import { faCalendarDays } from '@fortawesome/free-solid-svg-icons';
+import { faCalendarDays, faChartPie, faListUl } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+    ActivityIndicator,
+    Dimensions,
+    Modal,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from "react-native";
 import { PieChart } from "react-native-chart-kit";
 
 const screenWidth = Dimensions.get("window").width;
@@ -11,26 +23,41 @@ export default function CotizacionesScreen() {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
     const [pieData, setPieData] = useState<any[]>([]);
     const [razonesData, setRazonesData] = useState<any[]>([]);
     const [totalMovimientos, setTotalMovimientos] = useState(0);
 
-    const cargarDatos = async () => {
+    const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
+    const [mostrarCalendario, setMostrarCalendario] = useState(false);
+
+    const ID_USUARIO = 2;
+
+    const getColor = (categoria: string) => {
+        if (categoria === 'Aprobadas' || categoria === 'Completado') return '#7CCB64';
+        if (categoria === 'Canceladas') return '#FE5F5F';
+        return '#3A88F6';
+    };
+
+    const fetchCotizaciones = async () => {
         try {
-            const IP = "192.168.100.14";
-            const ID_USUARIO = 2;
+            let url = `http://192.168.100.14:8082/api/dashboard/movil/graficas?idUsuario=${ID_USUARIO}`;
 
-            const response = await fetch(`http://${IP}:8082/api/dashboard/movil/graficas?idUsuario=${ID_USUARIO}`);
+            if (fechaSeleccionada) {
+                const year = fechaSeleccionada.getFullYear();
+                const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
+                const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
+                const fechaFiltroStr = `${year}-${month}-${day}`;
 
+                url += `&fecha=${fechaFiltroStr}`;
+            }
+
+            const response = await fetch(url);
             if (!response.ok) throw new Error(`Error API: ${response.status}`);
-
             const data = await response.json();
 
-            console.log("DATA RADAR:", JSON.stringify(data.datosRadar, null, 2));
-
             let suma = 0;
-            const pastel = (data.datosPastel || []).map((item: any) => {
+
+            const graficaPastel = (data.datosPastel || []).map((item: any) => {
                 suma += item.cantidad;
                 return {
                     name: item.categoria,
@@ -40,7 +67,7 @@ export default function CotizacionesScreen() {
                     legendFontSize: 12
                 };
             });
-            setPieData(pastel);
+            setPieData(graficaPastel);
             setTotalMovimientos(suma);
 
             if (data.datosRadar && Array.isArray(data.datosRadar)) {
@@ -48,7 +75,6 @@ export default function CotizacionesScreen() {
                     texto: item.etiqueta || "Sin motivo",
                     cantidad: item.valor || 0
                 }));
-
                 const razonesFiltradas = razones.filter((r: any) => r.cantidad > 0);
                 setRazonesData(razonesFiltradas);
             } else {
@@ -56,7 +82,9 @@ export default function CotizacionesScreen() {
             }
 
         } catch (error) {
-            console.error("❌ Error cargando datos:", error);
+            console.error("Error cargando datos:", error);
+            setPieData([]);
+            setRazonesData([]);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -64,36 +92,35 @@ export default function CotizacionesScreen() {
     };
 
     useEffect(() => {
-        cargarDatos();
-    }, []);
+        setLoading(true);
+        fetchCotizaciones();
+    }, [fechaSeleccionada]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        cargarDatos();
+        fetchCotizaciones();
     };
 
-    const getColor = (categoria: string) => {
-        if (categoria === 'Aprobadas' || categoria === 'Completado') return '#7EDD83';
-        if (categoria === 'Canceladas') return '#DD7E7E';
-        return '#7E96DD';
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setMostrarCalendario(false);
+            if (event.type === 'set' && selectedDate) setFechaSeleccionada(selectedDate);
+            return;
+        }
+        if (selectedDate) setFechaSeleccionada(selectedDate);
     };
+
+    const cerrarCalendario = () => setMostrarCalendario(false);
+    const limpiarFecha = () => setFechaSeleccionada(null);
 
     const chartConfig = {
-        backgroundGradientFrom: "#1E2923",
+        backgroundGradientFrom: "#ffffff",
         backgroundGradientFromOpacity: 0,
-        backgroundGradientTo: "#08130D",
-        backgroundGradientToOpacity: 0.5,
+        backgroundGradientTo: "#ffffff",
+        backgroundGradientToOpacity: 0,
         color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
         strokeWidth: 2,
     };
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#7E96DD" />
-            </View>
-        );
-    }
 
     return (
         <>
@@ -106,159 +133,175 @@ export default function CotizacionesScreen() {
                     headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
                     headerRight: () => (
-                        <TouchableOpacity style={{ marginRight: 20 }}>
-                            <FontAwesomeIcon icon={faCalendarDays} size={20} color="#525252" />
+                        <TouchableOpacity onPress={() => setMostrarCalendario(true)} style={{ marginRight: 20 }}>
+                            <FontAwesomeIcon icon={faCalendarDays} size={20} color={fechaSeleccionada ? "#3A88F6" : "#525252"} />
                         </TouchableOpacity>
                     ),
                 }}
             />
 
             <View style={styles.container}>
+
+                {/* BARRA DE FILTRO ACTIVO */}
+                {fechaSeleccionada && (
+                    <View style={styles.filtroBar}>
+                        <Text style={styles.filtroTexto}>
+                            Filtrando por: {fechaSeleccionada.toISOString().split('T')[0]}
+                        </Text>
+                        <TouchableOpacity onPress={limpiarFecha}>
+                            <Text style={styles.filtroReset}>Reestablecer</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <ScrollView
                     contentContainerStyle={styles.scrollContainer}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                 >
 
-                    {/* --- GRÁFICA DE PASTEL --- */}
-                    <View style={styles.cakecontainer}>
-                        <Text style={styles.titulo1}>{"Estado de Cotizaciones"}</Text>
+                    {loading && !refreshing ? (
+                        <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 20 }} />
+                    ) : (
+                        <>
+                            {/* GRÁFICA DE PASTEL */}
+                            <View style={styles.cardContainer}>
+                                <View style={styles.cardHeader}>
+                                    <FontAwesomeIcon icon={faChartPie} size={16} color="#3A88F6" style={{ marginRight: 8 }} />
+                                    <Text style={styles.cardTitle}>Estado General</Text>
+                                </View>
 
-                        {pieData.length > 0 ? (
-                            <PieChart
-                                data={pieData}
-                                width={screenWidth - 40}
-                                height={220}
-                                chartConfig={chartConfig}
-                                accessor={"population"}
-                                backgroundColor={"transparent"}
-                                paddingLeft={"15"}
-                                center={[0, 0]}
-                                absolute
-                            />
-                        ) : (
-                            <Text style={styles.noDataText}>No hay datos disponibles</Text>
-                        )}
-                    </View>
-
-                    {/* --- RAZONES DE RECHAZO (LISTA VISUAL) --- */}
-                    <View style={styles.graphiccontainer}>
-                        <Text style={styles.titulo2}>{"Razones de rechazo"}</Text>
-
-                        {razonesData.length === 0 ? (
-                            <Text style={styles.noDataText}>No hay cancelaciones registradas.</Text>
-                        ) : (
-                            razonesData.map((item, index) => {
-                                const maxVal = Math.max(...razonesData.map(r => r.cantidad));
-                                const porcentaje = maxVal > 0 ? (item.cantidad / maxVal) * 100 : 0;
-
-                                return (
-                                    <View key={index} style={styles.reasonRow}>
-                                        <View style={styles.reasonHeader}>
-                                            {/* AQUI SE MUESTRA EL TEXTO QUE NO SALÍA */}
-                                            <Text style={styles.reasonLabel}>{item.texto}</Text>
-                                            <Text style={styles.reasonCount}>{item.cantidad}</Text>
-                                        </View>
-
-                                        {/* Barra Roja */}
-                                        <View style={styles.track}>
-                                            <View style={[styles.bar, { width: `${porcentaje}%` }]} />
-                                        </View>
+                                {pieData.length > 0 ? (
+                                    <View style={{ alignItems: 'center' }}>
+                                        <PieChart
+                                            data={pieData}
+                                            width={screenWidth - 60}
+                                            height={220}
+                                            chartConfig={chartConfig}
+                                            accessor={"population"}
+                                            backgroundColor={"transparent"}
+                                            paddingLeft={"15"}
+                                            center={[0, 0]}
+                                            absolute
+                                        />
                                     </View>
-                                );
-                            })
-                        )}
-                    </View>
+                                ) : (
+                                    <Text style={styles.noDataText}>No hay datos en este periodo.</Text>
+                                )}
+                            </View>
+
+                            {/* LISTA DE RAZONES */}
+                            <View style={styles.cardContainer}>
+                                <View style={styles.cardHeader}>
+                                    <FontAwesomeIcon icon={faListUl} size={16} color="#3A88F6" style={{ marginRight: 8 }} />
+                                    <Text style={styles.cardTitle}>Razones de Rechazo</Text>
+                                </View>
+
+                                {razonesData.length === 0 ? (
+                                    <Text style={styles.noDataText}>No hay cancelaciones registradas.</Text>
+                                ) : (
+                                    razonesData.map((item, index) => {
+                                        const maxVal = Math.max(...razonesData.map(r => r.cantidad));
+                                        const porcentaje = maxVal > 0 ? (item.cantidad / maxVal) * 100 : 0;
+
+                                        return (
+                                            <View key={index} style={styles.reasonRow}>
+                                                <View style={styles.reasonHeader}>
+                                                    <Text style={styles.reasonLabel}>{item.texto}</Text>
+                                                    <Text style={styles.reasonCount}>{item.cantidad}</Text>
+                                                </View>
+                                                <View style={styles.track}>
+                                                    <View style={[styles.bar, { width: `${porcentaje}%` }]} />
+                                                </View>
+                                            </View>
+                                        );
+                                    })
+                                )}
+                            </View>
+                        </>
+                    )}
 
                 </ScrollView>
+
+                {/* MODAL DE CALENDARIO */}
+                {mostrarCalendario && (
+                    Platform.OS === 'ios' ? (
+                        <Modal transparent={true} animationType="fade" visible={mostrarCalendario} onRequestClose={cerrarCalendario}>
+                            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={cerrarCalendario}>
+                                <View style={styles.iosDatePickerContainer} onStartShouldSetResponder={() => true}>
+                                    <View style={styles.iosToolbar}>
+                                        <TouchableOpacity onPress={cerrarCalendario}>
+                                            <Text style={styles.iosButtonText}>Listo</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="spinner" onChange={onDateChange} textColor="#000000" themeVariant="light" />
+                                </View>
+                            </TouchableOpacity>
+                        </Modal>
+                    ) : (
+                        <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="default" onChange={onDateChange} />
+                    )
+                )}
+
             </View>
         </>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: "#FFFFFF",
-    },
-    scrollContainer: {
-        flexGrow: 1,
-        paddingTop: 20,
+    container: { flex: 1, backgroundColor: "#F5F5F5" },
+    scrollContainer: { padding: 20, paddingBottom: 50 },
+
+    filtroBar: {
+        flexDirection: 'row',
         paddingHorizontal: 20,
-        paddingBottom: 100,
-    },
-    titulo1: {
-        fontSize: 14,
-        fontWeight: "bold",
-        fontFamily: "LexendTera-SemiBold",
-        marginBottom: 10,
-        alignSelf: 'flex-start',
-        color: '#333'
-    },
-    titulo2: {
-        fontSize: 14,
-        fontWeight: "bold",
-        fontFamily: "LexendTera-SemiBold",
-        marginBottom: 20,
-        alignSelf: 'flex-start',
-        color: '#333'
-    },
-    cakecontainer: {
-        flexDirection: "column",
-        backgroundColor: "#F5F5F5",
-        borderRadius: 20,
-        marginBottom: 20,
-        padding: 20,
+        paddingVertical: 10,
         alignItems: 'center',
+        backgroundColor: '#F0F8FF'
     },
-    graphiccontainer: {
-        flexDirection: "column",
-        backgroundColor: "#F5F5F5",
-        borderRadius: 20,
+    filtroTexto: { color: '#3A88F6', fontWeight: 'bold', marginRight: 10 },
+    filtroReset: { color: '#FF5555', fontWeight: 'bold' },
+
+    cardContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
         marginBottom: 20,
-        padding: 20,
+        padding: 15,
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4
     },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+        paddingBottom: 10
+    },
+    cardTitle: {
+        fontSize: 16,
+        fontWeight: "bold",
+        color: "#333",
+        fontFamily: "LexendTera-SemiBold",
+    },
+
     noDataText: {
         color: '#999',
         fontStyle: 'italic',
-        marginTop: 20,
-        textAlign: 'center'
+        textAlign: 'center',
+        marginVertical: 20
     },
-    reasonRow: {
-        marginBottom: 15,
-        width: '100%'
-    },
-    reasonHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 6
-    },
-    reasonLabel: {
-        fontSize: 13,
-        color: '#555',
-        fontWeight: '600',
-        maxWidth: '85%'
-    },
-    reasonCount: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: '#DD7E7E'
-    },
-    track: {
-        height: 8,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 4,
-        width: '100%',
-        overflow: 'hidden'
-    },
-    bar: {
-        height: '100%',
-        backgroundColor: '#DD7E7E',
-        borderRadius: 4
-    }
+    reasonRow: { marginBottom: 15, width: '100%' },
+    reasonHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+    reasonLabel: { fontSize: 13, color: '#555', fontWeight: '600', maxWidth: '85%' },
+    reasonCount: { fontSize: 13, fontWeight: 'bold', color: '#FE5F5F' },
+    track: { height: 8, backgroundColor: '#E0E0E0', borderRadius: 4, width: '100%', overflow: 'hidden' },
+    bar: { height: '100%', backgroundColor: '#FE5F5F', borderRadius: 4 },
+
+    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+    iosDatePickerContainer: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 20 },
+    iosToolbar: { flexDirection: 'row', justifyContent: 'flex-end', padding: 15, borderBottomWidth: 1, borderBottomColor: '#E0E0E0', backgroundColor: '#F8F8F8', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+    iosButtonText: { color: '#3A88F6', fontSize: 16, fontWeight: 'bold' },
 });
