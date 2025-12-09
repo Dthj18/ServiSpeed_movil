@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "echo 'Pruebas omitidas por ahora' && exit 0",
+    "test": "jest",
     "lint": "expo lint"
   },
   "dependencies": {
