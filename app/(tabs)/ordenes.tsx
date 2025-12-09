@@ -2,8 +2,8 @@ import { faCalendarDays, faClock, faFileInvoiceDollar, faInfoCircle, faTimes, fa
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface OrdenCard {
     idOrden: number;
@@ -23,6 +23,8 @@ export default function OrdenesScreen() {
 
     const [ordenes, setOrdenes] = useState<OrdenCard[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
     const [filtroActivo, setFiltroActivo] = useState("Todas");
     const opcionesFiltro = ["Todas", "En curso", "Completadas", "Canceladas"];
     const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
@@ -31,21 +33,28 @@ export default function OrdenesScreen() {
     const [modalDetalleVisible, setModalDetalleVisible] = useState(false);
     const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCard | null>(null);
 
+    const fetchOrdenes = async () => {
+        try {
+            const response = await fetch('http://192.168.100.14:8082/api/ordenes/movil/tarjetas');
+            if (!response.ok) throw new Error("Error en el servidor");
+            const data = await response.json();
+            if (Array.isArray(data)) setOrdenes(data);
+            else setOrdenes([]);
+        } catch (error) {
+            console.error("Error: ", error);
+            setOrdenes([]);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchOrdenes = async () => {
-            try {
-                const response = await fetch('http://192.168.100.14:8082/api/ordenes/movil/tarjetas');
-                if (!response.ok) throw new Error("Error en el servidor");
-                const data = await response.json();
-                if (Array.isArray(data)) setOrdenes(data);
-                else setOrdenes([]);
-            } catch (error) {
-                console.error("Error: ", error);
-                setOrdenes([]);
-            } finally {
-                setLoading(false);
-            }
-        };
+        fetchOrdenes();
+    }, []);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
         fetchOrdenes();
     }, []);
 
@@ -120,7 +129,17 @@ export default function OrdenesScreen() {
                     </View>
                 )}
 
-                <ScrollView contentContainerStyle={styles.scrollContainer}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContainer}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={["#3A88F6"]}
+                            tintColor="#3A88F6"
+                        />
+                    }
+                >
                     <Text style={styles.titulo}>{"Filtros de Órdenes"}</Text>
 
                     <View style={styles.filtrosContainer}>
@@ -133,7 +152,7 @@ export default function OrdenesScreen() {
                         ))}
                     </View>
 
-                    {loading ? (
+                    {loading && !refreshing ? (
                         <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 20 }} />
                     ) : (
                         listaParaMostrar.map((item) => {
@@ -392,7 +411,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         fontSize: 16,
     },
-    // ...
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
