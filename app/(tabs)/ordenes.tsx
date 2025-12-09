@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface OrdenCard {
     idOrden: number;
@@ -170,7 +170,12 @@ export default function OrdenesScreen() {
                                             <Text style={styles.cardNombre}>{item.nombreCliente}</Text>
                                             <View style={styles.cardFila}>
                                                 <View style={styles.cardFechaContainer}>
-                                                    <Image source={{ uri: "https://storage.googleapis.com/tagjs-prod.appspot.com/v1/3j9CazomhD/vqua0tr7_expires_30_days.png" }} resizeMode={"stretch"} style={styles.cardIcono} />
+                                                    <FontAwesomeIcon
+                                                        icon={faCalendarDays}
+                                                        size={14}
+                                                        color={colorTema}
+                                                        style={{ marginRight: 6 }}
+                                                    />
                                                     <Text style={[styles.cardFechaTexto, { color: colorTema }]}>{item.fecha}</Text>
                                                 </View>
                                                 <View style={styles.filtroSpacer}></View>
