@@ -155,7 +155,7 @@ describe('OrdenesScreen', () => {
     // Solo verificamos que renderice el título y no explote, 
     // aunque la lista esté vacía.
     await waitFor(() => {
-      expect(getByText('Filtros de Órdenes')).toBeTruthy();
+      expect(getByText('Filtro de Órdenes')).toBeTruthy();
     });
   });
 
