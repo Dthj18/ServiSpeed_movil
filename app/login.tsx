@@ -1,28 +1,73 @@
 import { faEnvelope, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-
-
 export default function LoginScreen() {
+    const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const router = useRouter();
+    const [loading, setLoading] = useState(false);
 
-    const onLoginPress = () => {
-        console.log("Iniciando sesión con:", email, password);
-        router.replace('../cotizaciones')
+    const handleLogin = async () => {
+        if (!email || !password) {
+            Alert.alert('Error', 'Por favor ingresa correo y contraseña');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            // --- MODO DEMO / OFFLINE ---
+            console.log("Saltando conexión al servidor...");
+
+            // 1. Guardamos un token falso para que la app crea que hay sesión
+            await AsyncStorage.setItem('userToken', 'demo-token-12345');
+
+            // 2. Redirigimos directamente al dashboard
+            router.replace('./(tabs)/dashboard');
+
+            /* ---------------------------------------------------------
+               CÓDIGO ORIGINAL (COMENTADO TEMPORALMENTE)
+               Descomenta esto cuando quieras volver a conectar la API
+            --------------------------------------------------------- */
+            /*
+            const response = await fetch('http://10.0.0.1:8089/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    password: password,
+                }),
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                await AsyncStorage.setItem('userToken', data.token);
+                router.replace('./(tabs)/dashboard');
+            } else {
+                Alert.alert('Error de autenticación', data.message || 'Correo o contraseña incorrectos');
+            }
+            */
+            /* --------------------------------------------------------- */
+
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "Ocurrió un error en el inicio de sesión");
+        } finally {
+            setLoading(false);
+        }
     };
-
-
 
     return (
         <>
-            <Stack.Screen options={{ headerShown: false }}/>
+            <Stack.Screen options={{ headerShown: false }} />
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
                 <LinearGradient
                     colors={['#7EE2B5', '#457C63']}
@@ -31,59 +76,61 @@ export default function LoginScreen() {
                 <KeyboardAvoidingView
                     style={{ flex: 1 }}
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
-                ></KeyboardAvoidingView>
-                <ScrollView contentContainerStyle={styles.scrollContainer} scrollEnabled={false}>
-                    <Image
-                        source={require('../assets/images/logo.png')}
-                        resizeMode={"stretch"}
-                        style={styles.logo}
-                    />
-                    <View style={styles.formContainer}>
-                        <Text style={styles.title}>{"Login"}</Text>
+                >
+                    <ScrollView contentContainerStyle={styles.scrollContainer} scrollEnabled={false}>
+                        <Image
+                            source={require('../assets/images/logo.png')}
+                            resizeMode={"stretch"}
+                            style={styles.logo}
+                        />
+                        <View style={styles.formContainer}>
+                            <Text style={styles.title}>{"Login"}</Text>
 
-                        <View style={styles.inputContainer}>
-                            <FontAwesomeIcon
-                                icon={faEnvelope}
-                                style={styles.emailIcon}
-                                size={20}
-                            />
-                            <TextInput placeholder={"Correo Electrónico"}
-                                value={email}
-                                onChangeText={setEmail}
-                                style={styles.input}
-                                placeholderTextColor="#666"
-                                keyboardType="email-address"
-                                autoCapitalize="none">
-                            </TextInput>
+                            <View style={styles.inputContainer}>
+                                <FontAwesomeIcon
+                                    icon={faEnvelope}
+                                    style={styles.emailIcon}
+                                    size={20}
+                                />
+                                <TextInput placeholder={"Correo Electrónico"}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    style={styles.input}
+                                    placeholderTextColor="#666"
+                                    keyboardType="email-address"
+                                    autoCapitalize="none">
+                                </TextInput>
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <FontAwesomeIcon
+                                    icon={faKey}
+                                    style={styles.emailIcon}
+                                    size={20}
+                                />
+                                <TextInput
+                                    placeholder={"Contraseña"}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    style={styles.input}
+                                    placeholderTextColor="#666"
+                                    secureTextEntry={true}
+                                />
+                            </View>
+
+                            <TouchableOpacity onPress={handleLogin}
+                                style={styles.loginButtonWrapper}>
+                                <LinearGradient colors={["#7EE2B585", "#457C6385"]}
+                                    style={styles.loginButtonGradient}>
+                                    <Text style={styles.loginButtonText}>
+                                        {loading ? "Cargando..." : "Iniciar Sesión"}
+                                    </Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+
                         </View>
-
-                        <View style={styles.inputContainer}>
-                            <FontAwesomeIcon
-                                icon={faKey}
-                                style={styles.emailIcon}
-                                size={20}
-                            />
-                            <TextInput
-                                placeholder={"Contraseña"}
-                                value={password}
-                                onChangeText={setPassword}
-                                style={styles.input}
-                                placeholderTextColor="#666"
-                                secureTextEntry={true}
-                            />
-                        </View>
-
-                        <TouchableOpacity onPress={onLoginPress}
-                            style={styles.loginButtonWrapper}>
-                            <LinearGradient colors={["#7EE2B585", "#457C6385"]}
-                                style={styles.loginButtonGradient}>
-                                <Text style={styles.loginButtonText}>{"Iniciar Sesión"}</Text>
-
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                    </View>
-                </ScrollView>
+                    </ScrollView>
+                </KeyboardAvoidingView>
             </SafeAreaView>
         </>
     );

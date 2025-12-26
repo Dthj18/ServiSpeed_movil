@@ -35,7 +35,7 @@ export default function OrdenesScreen() {
 
     const fetchOrdenes = async () => {
         try {
-            const response = await fetch('http://192.168.100.14:8082/api/ordenes/movil/tarjetas');
+            const response = await fetch('http://10.0.0.1:8082/api/ordenes/movil/tarjetas');
             if (!response.ok) throw new Error("Error en el servidor");
             const data = await response.json();
             if (Array.isArray(data)) setOrdenes(data);
