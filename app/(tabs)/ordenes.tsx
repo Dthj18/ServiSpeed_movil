@@ -1,15 +1,16 @@
-import { faCalendarDays, faClock, faFileInvoiceDollar, faInfoCircle, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
+import { faBoxOpen, faCalendarDays, faClock, faFileInvoiceDollar, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Dimensions, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 interface OrdenCard {
     idOrden: number;
     nombreCliente: string;
     fecha: string;
     productoPrincipal: string;
+    detallesJson?: string;
     estatus: string;
     claveEstatus: string;
     fechaIso: string;
@@ -32,10 +33,12 @@ export default function OrdenesScreen() {
 
     const [modalDetalleVisible, setModalDetalleVisible] = useState(false);
     const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCard | null>(null);
+    const [verHistorialCompleto, setVerHistorialCompleto] = useState(false);
+
 
     const fetchOrdenes = async () => {
         try {
-            const response = await fetch('http://10.0.0.1:8082/api/ordenes/movil/tarjetas');
+            const response = await fetch('http://192.168.100.14:8082/api/ordenes/movil/tarjetas');
             if (!response.ok) throw new Error("Error en el servidor");
             const data = await response.json();
             if (Array.isArray(data)) setOrdenes(data);
@@ -72,6 +75,16 @@ export default function OrdenesScreen() {
                 const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
                 const fechaFiltroStr = `${year}-${month}-${day}`;
                 if (orden.fechaIso !== fechaFiltroStr) return false;
+            } else {
+                const hoy = new Date();
+                const mesActual = (hoy.getMonth() + 1).toString().padStart(2, '0');
+                const anioActual = hoy.getFullYear().toString();
+
+                const [anioOrden, mesOrden] = orden.fechaIso.split('-');
+
+                if (anioOrden !== anioActual || mesOrden !== mesActual) {
+                    return false;
+                }
             }
             if (filtroActivo === "Todas") return true;
             if (filtroActivo === "Completadas") return orden.claveEstatus === 'ORD_ENTREGADA';
@@ -98,6 +111,22 @@ export default function OrdenesScreen() {
         setOrdenSeleccionada(orden);
         setModalDetalleVisible(true);
     };
+
+    const obtenerProductosDetalle = () => {
+        if (!ordenSeleccionada || !ordenSeleccionada.detallesJson) return [];
+
+        try {
+            return JSON.parse(ordenSeleccionada.detallesJson);
+        } catch (error) {
+            console.log("Error al leer los productos", error);
+            return [];
+        }
+    };
+
+    const listaProductos = obtenerProductosDetalle();
+
+    const { height: screenHeight } = Dimensions.get('window');
+
 
     return (
         <>
@@ -127,6 +156,8 @@ export default function OrdenesScreen() {
                             <Text style={{ color: '#FF5555', fontWeight: 'bold' }}>Reestablecer</Text>
                         </TouchableOpacity>
                     </View>
+
+
                 )}
 
                 <ScrollView
@@ -140,7 +171,7 @@ export default function OrdenesScreen() {
                         />
                     }
                 >
-                    <Text style={styles.titulo}>{"Filtros de Órdenes"}</Text>
+                    <Text style={styles.titulo}>{"Filtro de Órdenes"}</Text>
 
                     <View style={styles.filtrosContainer}>
                         {opcionesFiltro.map((opcion) => (
@@ -247,13 +278,64 @@ export default function OrdenesScreen() {
                                 </View>
                             </View>
 
-                            <View style={styles.detailRow}>
-                                <View style={styles.iconContainer}>
-                                    <FontAwesomeIcon icon={faInfoCircle} size={18} color="#3A88F6" />
+                            <View style={[styles.detailRow, { alignItems: 'flex-start' }]}>
+                                <View style={[styles.iconContainer, { marginTop: 2 }]}>
+                                    <FontAwesomeIcon icon={faBoxOpen} size={18} color="#3A88F6" />
                                 </View>
                                 <View style={styles.detailTextContainer}>
-                                    <Text style={styles.detailLabel}>Descripción</Text>
-                                    <Text style={styles.detailValue}>{ordenSeleccionada?.productoPrincipal}</Text>
+                                    <Text style={styles.detailLabel}>Productos ({listaProductos.length})</Text>
+
+                                    {listaProductos.length > 0 ? (
+                                        <View style={{ marginTop: 5, maxHeight: 120 }}>
+
+                                            <ScrollView
+                                                nestedScrollEnabled={true}
+                                                showsVerticalScrollIndicator={true}
+                                                contentContainerStyle={{ paddingRight: 5 }}
+                                            >
+                                                {listaProductos.map((item: any, index: number) => (
+                                                    <View key={index} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
+
+                                                        {/* COLUMNA 1: Cantidad */}
+                                                        <Text style={{
+                                                            width: 45,
+                                                            textAlign: 'right',
+                                                            fontWeight: '600',
+                                                            color: '#333',
+                                                            fontSize: 13,
+                                                            marginTop: 2
+                                                        }}>
+                                                            {item.cantidad}
+                                                        </Text>
+
+                                                        {/* COLUMNA 2: Separador */}
+                                                        <Text style={{
+                                                            width: 25,
+                                                            textAlign: 'center',
+                                                            color: '#999',
+                                                            fontSize: 13,
+                                                            marginTop: 2
+                                                        }}>
+                                                            x
+                                                        </Text>
+
+                                                        {/* COLUMNA 3: Descripción */}
+                                                        <Text style={{
+                                                            flex: 1,
+                                                            flexWrap: 'wrap',
+                                                            color: '#555',
+                                                            fontSize: 14,
+                                                            lineHeight: 20
+                                                        }}>
+                                                            {item.descripcion}
+                                                        </Text>
+                                                    </View>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    ) : (
+                                        <Text style={styles.detailValue}>{ordenSeleccionada?.productoPrincipal}</Text>
+                                    )}
                                 </View>
                             </View>
 
@@ -330,7 +412,7 @@ export default function OrdenesScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#F5F5F5" },
     scrollContainer: { padding: 20 },
-    titulo: { fontSize: 18, fontWeight: "bold", marginBottom: 15, color: "#333" },
+    titulo: { fontSize: 13, fontWeight: "bold", marginBottom: 15, color: "#333", fontFamily: "LexendTera-SemiBold" },
 
     filtrosContainer: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#FFFFFF', borderRadius: 25, borderWidth: 1, borderColor: '#E0E0E0', marginBottom: 20, width: '100%',
@@ -351,7 +433,7 @@ const styles = StyleSheet.create({
     cardPillTexto: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
     cardDescripcion: { fontSize: 12, color: '#666' },
 
-    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }, // Oscuro para modal
+    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
     iosDatePickerContainer: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 20 },
     iosToolbar: { flexDirection: 'row', justifyContent: 'flex-end', padding: 15, borderBottomWidth: 1, borderBottomColor: '#E0E0E0', backgroundColor: '#F8F8F8', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
     iosButtonText: { color: '#3A88F6', fontSize: 16, fontWeight: 'bold' },
