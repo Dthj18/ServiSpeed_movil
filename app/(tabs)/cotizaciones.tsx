@@ -40,7 +40,7 @@ export default function CotizacionesScreen() {
 
     const fetchCotizaciones = async () => {
         try {
-            let url = `http://192.168.100.14:8082/api/dashboard/movil/graficas?idUsuario=${ID_USUARIO}`;
+            let url = `http://10.0.0.1:8082/api/dashboard/movil/graficas?idUsuario=${ID_USUARIO}`;
 
             if (fechaSeleccionada) {
                 const year = fechaSeleccionada.getFullYear();
