@@ -5,7 +5,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -22,20 +21,6 @@ export default function LoginScreen() {
         setLoading(true);
 
         try {
-            // --- MODO DEMO / OFFLINE ---
-            console.log("Saltando conexión al servidor...");
-
-            // 1. Guardamos un token falso para que la app crea que hay sesión
-            await AsyncStorage.setItem('userToken', 'demo-token-12345');
-
-            // 2. Redirigimos directamente al dashboard
-            router.replace('./(tabs)/dashboard');
-
-            /* ---------------------------------------------------------
-               CÓDIGO ORIGINAL (COMENTADO TEMPORALMENTE)
-               Descomenta esto cuando quieras volver a conectar la API
-            --------------------------------------------------------- */
-            /*
             const response = await fetch('http://10.0.0.1:8089/auth/login', {
                 method: 'POST',
                 headers: {
@@ -54,8 +39,6 @@ export default function LoginScreen() {
             } else {
                 Alert.alert('Error de autenticación', data.message || 'Correo o contraseña incorrectos');
             }
-            */
-            /* --------------------------------------------------------- */
 
         } catch (error) {
             console.error(error);
@@ -68,44 +51,55 @@ export default function LoginScreen() {
     return (
         <>
             <Stack.Screen options={{ headerShown: false }} />
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+            <View style={styles.container}>
                 <LinearGradient
                     colors={['#7EE2B5', '#457C63']}
                     style={StyleSheet.absoluteFill}
                 />
+
                 <KeyboardAvoidingView
                     style={{ flex: 1 }}
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
                 >
-                    <ScrollView contentContainerStyle={styles.scrollContainer} scrollEnabled={false}>
-                        <Image
-                            source={require('../assets/images/logo.png')}
-                            resizeMode={"stretch"}
-                            style={styles.logo}
-                        />
-                        <View style={styles.formContainer}>
-                            <Text style={styles.title}>{"Login"}</Text>
+                    <ScrollView
+                        contentContainerStyle={styles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        bounces={false} 
+                        overScrollMode="never"
+                    >
+                        <View style={styles.topSection}>
+                            <Image
+                                source={require('../assets/images/logo.png')}
+                                resizeMode={"contain"}
+                                style={styles.logo}
+                            />
+                        </View>
+
+                        <View style={styles.bottomSection}>
+                            <Text style={styles.title}>Login</Text>
 
                             <View style={styles.inputContainer}>
                                 <FontAwesomeIcon
                                     icon={faEnvelope}
-                                    style={styles.emailIcon}
+                                    style={styles.inputIcon}
                                     size={20}
                                 />
-                                <TextInput placeholder={"Correo Electrónico"}
+                                <TextInput
+                                    placeholder={"Correo Electrónico"}
                                     value={email}
                                     onChangeText={setEmail}
                                     style={styles.input}
                                     placeholderTextColor="#666"
                                     keyboardType="email-address"
-                                    autoCapitalize="none">
-                                </TextInput>
+                                    autoCapitalize="none"
+                                />
                             </View>
 
                             <View style={styles.inputContainer}>
                                 <FontAwesomeIcon
                                     icon={faKey}
-                                    style={styles.emailIcon}
+                                    style={styles.inputIcon}
                                     size={20}
                                 />
                                 <TextInput
@@ -118,20 +112,20 @@ export default function LoginScreen() {
                                 />
                             </View>
 
-                            <TouchableOpacity onPress={handleLogin}
-                                style={styles.loginButtonWrapper}>
-                                <LinearGradient colors={["#7EE2B585", "#457C6385"]}
-                                    style={styles.loginButtonGradient}>
+                            <TouchableOpacity onPress={handleLogin} style={styles.loginButtonWrapper}>
+                                <LinearGradient
+                                    colors={["#7EE2B585", "#457C6385"]}
+                                    style={styles.loginButtonGradient}
+                                >
                                     <Text style={styles.loginButtonText}>
                                         {loading ? "Cargando..." : "Iniciar Sesión"}
                                     </Text>
                                 </LinearGradient>
                             </TouchableOpacity>
-
                         </View>
                     </ScrollView>
                 </KeyboardAvoidingView>
-            </SafeAreaView>
+            </View>
         </>
     );
 }
@@ -140,23 +134,32 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    scrollContainer: {
-        flexGrow: 1,
-        justifyContent: 'flex-end',
+    scrollContent: {
+        flexGrow: 1, 
     },
-    formContainer: {
+    topSection: {
+        flex: 1, 
+        minHeight: 250,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    logo: {
+        width: 180,
+        height: 180,
+    },
+    bottomSection: {
         backgroundColor: "#E2E2E2",
-        height: '55%',
         borderTopLeftRadius: 50,
         borderTopRightRadius: 50,
         paddingHorizontal: 30,
-        paddingTop: 50,
+        paddingTop: 40,
+        paddingBottom: 40, 
+        width: '100%',
     },
     title: {
         color: "#000000",
         fontSize: 36,
-        fontWeight: 'normal',
-        marginBottom: 32,
+        marginBottom: 30,
         marginLeft: 10,
     },
     inputContainer: {
@@ -164,44 +167,33 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "#FFFFFF",
         borderRadius: 21,
-        marginBottom: 13,
-        marginHorizontal: 2,
+        marginBottom: 15,
         height: 50,
         paddingHorizontal: 15,
-
     },
     input: {
         color: "#000000",
-        fontSize: 13,
+        fontSize: 14,
         flex: 1,
-        marginLeft: 1,
-        opacity: 0.7,
-        paddingVertical: 0,
+        marginLeft: 10,
+        height: '100%',
     },
-    emailIcon: {
-        marginLeft: 17,
-        marginRight: 7,
-        opacity: 0.25,
+    inputIcon: {
+        opacity: 0.3,
     },
     loginButtonWrapper: {
         borderRadius: 21,
-        marginBottom: 172,
-        marginHorizontal: 2,
+        marginTop: 25,
         overflow: 'hidden',
+        marginBottom: 20,
     },
     loginButtonGradient: {
         alignItems: "center",
-        paddingTop: 13,
-        paddingBottom: 14,
+        paddingVertical: 15,
     },
     loginButtonText: {
         color: "#000000",
-        fontSize: 15,
+        fontSize: 16,
+        fontWeight: '500',
     },
-    logo: {
-        width: 200,
-        height: 200,
-        marginBottom: 40,
-        alignSelf: 'center'
-    }
 });
