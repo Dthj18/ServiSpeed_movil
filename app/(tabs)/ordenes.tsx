@@ -80,6 +80,8 @@ export default function OrdenesScreen() {
                 const mesActual = (hoy.getMonth() + 1).toString().padStart(2, '0');
                 const anioActual = hoy.getFullYear().toString();
 
+                if (!orden.fechaIso) return false;
+
                 const [anioOrden, mesOrden] = orden.fechaIso.split('-');
 
                 if (anioOrden !== anioActual || mesOrden !== mesActual) {
