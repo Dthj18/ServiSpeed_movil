@@ -38,7 +38,7 @@ export default function OrdenesScreen() {
 
     const fetchOrdenes = async () => {
         try {
-            const response = await fetch('http://192.168.100.14:8082/api/ordenes/movil/tarjetas');
+            const response = await fetch('http://10.0.0.1:8082/api/ordenes/movil/tarjetas');
             if (!response.ok) throw new Error("Error en el servidor");
             const data = await response.json();
             if (Array.isArray(data)) setOrdenes(data);
@@ -79,6 +79,8 @@ export default function OrdenesScreen() {
                 const hoy = new Date();
                 const mesActual = (hoy.getMonth() + 1).toString().padStart(2, '0');
                 const anioActual = hoy.getFullYear().toString();
+
+                if (!orden.fechaIso) return false;
 
                 const [anioOrden, mesOrden] = orden.fechaIso.split('-');
 
