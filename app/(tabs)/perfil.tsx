@@ -1,41 +1,69 @@
-import {
-    faBell,
-    faChevronRight,
-    faCircleQuestion,
-    faEnvelope,
-    faLock,
-    faRightFromBracket,
-    faUser,
-    faUserGear
-} from '@fortawesome/free-solid-svg-icons';
+import { faBell, faChevronRight, faCircleQuestion, faEnvelope, faLock, faRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
-import { useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from "react-native";
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function PerfilScreen() {
     const router = useRouter();
-    
-    // Estados para la UI
+
     const [notificaciones, setNotificaciones] = useState(true);
     const [modalPasswordVisible, setModalPasswordVisible] = useState(false);
     const [loadingLogout, setLoadingLogout] = useState(false);
 
-    // Estados para el formulario de contraseña
+    const [userData, setUserData] = useState({
+        nombre: 'Cargando...',
+        email: '...',
+        rol: '...'
+    });
+
     const [passActual, setPassActual] = useState('');
     const [passNueva, setPassNueva] = useState('');
     const [passConfirmar, setPassConfirmar] = useState('');
+
+    useFocusEffect(
+        useCallback(() => {
+            const obtenerDatosDePersona = async () => {
+                try {
+                    const token = await AsyncStorage.getItem('userToken');
+                    const jsonUser = await AsyncStorage.getItem('userData');
+                    if (!token || !jsonUser) return;
+                    const datosLocales = JSON.parse(jsonUser);
+                    const idUsuario = datosLocales.idUsuario;
+
+                    const response = await fetch(`http://10.0.0.1:8081/api/usuarios/${idUsuario}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    if (response.ok) {
+                        const persona = await response.json();
+                        setUserData({
+                            nombre: persona.nombre || persona.nombres || "Usuario",
+                            email: datosLocales.email,
+                            rol: datosLocales.rol
+                        });
+                    } else {
+                        setUserData({
+                            nombre: "Usuario (Error)",
+                            email: datosLocales.email,
+                            rol: datosLocales.rol
+                        });
+                    }
+
+                } catch (error) {
+                    console.error("Error conectando a Personas-Service:", error);
+                }
+            };
+
+            obtenerDatosDePersona();
+        }, [])
+    );
+
 
     const handleLogout = () => {
         Alert.alert(
@@ -43,23 +71,25 @@ export default function PerfilScreen() {
             "¿Estás seguro que deseas salir?",
             [
                 { text: "Cancelar", style: "cancel" },
-                { 
-                    text: "Salir", 
-                    style: "destructive", 
-                    onPress: () => {
+                {
+                    text: "Salir",
+                    style: "destructive",
+                    onPress: async () => {
                         setLoadingLogout(true);
-                        // Simulación de logout
+                        await AsyncStorage.removeItem('userToken');
+                        await AsyncStorage.removeItem('userData');
+
                         setTimeout(() => {
                             setLoadingLogout(false);
-                            router.replace('/login'); // Ajusta a tu ruta de login
+                            router.replace('/login');
                         }, 1000);
-                    } 
+                    }
                 }
             ]
         );
     };
 
-    const guardarPassword = () => {
+    const guardarPassword = async () => {
         if (!passActual || !passNueva || !passConfirmar) {
             Alert.alert("Error", "Todos los campos son obligatorios");
             return;
@@ -68,21 +98,62 @@ export default function PerfilScreen() {
             Alert.alert("Error", "Las contraseñas nuevas no coinciden");
             return;
         }
-        
-        // Aquí iría tu lógica de fetch para cambiar la password
-        Alert.alert("Éxito", "Tu contraseña ha sido actualizada correctamente");
-        setModalPasswordVisible(false);
-        setPassActual('');
-        setPassNueva('');
-        setPassConfirmar('');
+
+        try {
+            const token = await AsyncStorage.getItem('userToken');
+            const jsonUser = await AsyncStorage.getItem('userData');
+
+            if (!token || !jsonUser) {
+                Alert.alert("Error", "No se encontró sesión activa. Reingresa a la app.");
+                return;
+            }
+
+            const { idUsuario } = JSON.parse(jsonUser);
+
+            const response = await fetch(`http://10.0.0.1:8081/api/usuarios/${idUsuario}/cambiar-password`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    passwordActual: passActual,
+                    nuevaPassword: passNueva
+                })
+            });
+
+            if (response.ok) {
+                Alert.alert("Éxito", "Tu contraseña ha sido actualizada correctamente");
+                setModalPasswordVisible(false);
+                setPassActual('');
+                setPassNueva('');
+                setPassConfirmar('');
+            } else {
+                const errorText = await response.text();
+
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    const mensajeServidor = errorJson.message || errorJson.mensaje || "";
+
+                    if (response.status === 400 || mensajeServidor.includes("incorrecta")) {
+                        Alert.alert("Contraseña Incorrecta", "La contraseña actual que ingresaste no es la correcta. Inténtalo de nuevo.");
+                    } else {
+                        Alert.alert("Error", mensajeServidor || "No se pudo actualizar la contraseña.");
+                    }
+
+                } catch {
+                    Alert.alert("Error", "El servidor respondió con error: " + response.status);
+                }
+            }
+
+        } catch (error) {
+            console.error("ERROR DE CONEXIÓN:", error);
+            Alert.alert("Error", "Error de conexión con el servidor");
+        }
     };
 
     const MenuOption = ({ icon, title, subtitle, onPress, showChevron = true, isDestructive = false }: any) => (
-        <TouchableOpacity 
-            style={styles.menuItem} 
-            onPress={onPress}
-            activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
             <View style={[styles.iconBox, isDestructive && styles.iconBoxDestructive]}>
                 <FontAwesomeIcon icon={icon} size={18} color={isDestructive ? "#FE5F5F" : "#3A88F6"} />
             </View>
@@ -90,9 +161,7 @@ export default function PerfilScreen() {
                 <Text style={[styles.menuTitle, isDestructive && styles.menuTitleDestructive]}>{title}</Text>
                 {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
             </View>
-            {showChevron && (
-                <FontAwesomeIcon icon={faChevronRight} size={14} color="#CCC" />
-            )}
+            {showChevron && <FontAwesomeIcon icon={faChevronRight} size={14} color="#CCC" />}
         </TouchableOpacity>
     );
 
@@ -110,34 +179,30 @@ export default function PerfilScreen() {
             />
 
             <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-                
-                {/* 1. Tarjeta de Usuario */}
+
+                {/* 1. Tarjeta de Usuario DINÁMICA */}
                 <View style={styles.profileCard}>
                     <View style={styles.avatarContainer}>
                         <FontAwesomeIcon icon={faUser} size={40} color="#FFF" />
                     </View>
-                    <Text style={styles.userName}>Usuario Autorizado</Text>
-                    <Text style={styles.userRole}>Dueño / Contadora</Text>
+
+                    {/* AQUI USAMOS LAS VARIABLES DEL ESTADO */}
+                    <Text style={styles.userName}>{userData.nombre}</Text>
+                    <Text style={styles.userRole}>{userData.rol}</Text>
+
                     <View style={styles.emailBadge}>
-                        <FontAwesomeIcon icon={faEnvelope} size={10} color="#666" style={{marginRight: 5}}/>
-                        <Text style={styles.userEmail}>admin@servispeed.com</Text>
+                        <FontAwesomeIcon icon={faEnvelope} size={10} color="#666" style={{ marginRight: 5 }} />
+                        <Text style={styles.userEmail}>{userData.email}</Text>
                     </View>
                 </View>
 
-                {/* 2. Sección General */}
                 <Text style={styles.sectionTitle}>Cuenta</Text>
                 <View style={styles.menuContainer}>
-                    <MenuOption 
-                        icon={faLock} 
-                        title="Cambiar Contraseña" 
+                    <MenuOption
+                        icon={faLock}
+                        title="Cambiar Contraseña"
                         subtitle="Actualiza tu clave de acceso"
                         onPress={() => setModalPasswordVisible(true)}
-                    />
-                    <MenuOption 
-                        icon={faUserGear} 
-                        title="Datos Personales" 
-                        subtitle="Nombre, teléfono y dirección"
-                        onPress={() => {}} // Navegación opcional
                     />
                 </View>
 
@@ -152,19 +217,19 @@ export default function PerfilScreen() {
                             <Text style={styles.menuTitle}>Notificaciones</Text>
                             <Text style={styles.menuSubtitle}>Alertas de órdenes y estatus</Text>
                         </View>
-                        <Switch 
-                            value={notificaciones} 
+                        <Switch
+                            value={notificaciones}
                             onValueChange={setNotificaciones}
                             trackColor={{ false: "#E0E0E0", true: "#3A88F6" }}
                             thumbColor={"#FFFFFF"}
                         />
                     </View>
                     <View style={styles.divider} />
-                    <MenuOption 
-                        icon={faCircleQuestion} 
-                        title="Ayuda y Soporte" 
+                    <MenuOption
+                        icon={faCircleQuestion}
+                        title="Ayuda y Soporte"
                         subtitle="Contactar a sistemas"
-                        onPress={() => {}}
+                        onPress={() => { }}
                     />
                 </View>
 
@@ -184,7 +249,7 @@ export default function PerfilScreen() {
 
             </ScrollView>
 
-            {/* MODAL CAMBIAR CONTRASEÑA */}
+            {/* ... TU MODAL DE PASSWORD IGUAL ... */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -194,15 +259,15 @@ export default function PerfilScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeaderBar} />
-                        
+
                         <Text style={styles.modalTitle}>Cambiar Contraseña</Text>
                         <Text style={styles.modalSubtitle}>Ingresa tu contraseña actual y la nueva para confirmar el cambio.</Text>
 
                         <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>Contraseña Actual</Text>
-                            <TextInput 
-                                style={styles.input} 
-                                secureTextEntry 
+                            <TextInput
+                                style={styles.input}
+                                secureTextEntry
                                 placeholder="********"
                                 value={passActual}
                                 onChangeText={setPassActual}
@@ -211,9 +276,9 @@ export default function PerfilScreen() {
 
                         <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>Nueva Contraseña</Text>
-                            <TextInput 
-                                style={styles.input} 
-                                secureTextEntry 
+                            <TextInput
+                                style={styles.input}
+                                secureTextEntry
                                 placeholder="********"
                                 value={passNueva}
                                 onChangeText={setPassNueva}
@@ -222,9 +287,9 @@ export default function PerfilScreen() {
 
                         <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>Confirmar Nueva Contraseña</Text>
-                            <TextInput 
-                                style={styles.input} 
-                                secureTextEntry 
+                            <TextInput
+                                style={styles.input}
+                                secureTextEntry
                                 placeholder="********"
                                 value={passConfirmar}
                                 onChangeText={setPassConfirmar}
@@ -235,8 +300,8 @@ export default function PerfilScreen() {
                             <Text style={styles.saveButtonText}>Actualizar Contraseña</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            style={styles.cancelButton} 
+                        <TouchableOpacity
+                            style={styles.cancelButton}
                             onPress={() => setModalPasswordVisible(false)}
                         >
                             <Text style={styles.cancelButtonText}>Cancelar</Text>
@@ -251,8 +316,7 @@ export default function PerfilScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#F5F5F5" },
     scrollContent: { padding: 20 },
-    
-    // Header Profile Card
+
     profileCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 20,
@@ -280,17 +344,16 @@ const styles = StyleSheet.create({
     },
     userName: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 4 },
     userRole: { fontSize: 14, color: '#999', marginBottom: 10 },
-    emailBadge: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        backgroundColor: '#F5F5F5', 
-        paddingHorizontal: 12, 
-        paddingVertical: 6, 
-        borderRadius: 15 
+    emailBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15
     },
     userEmail: { fontSize: 12, color: '#666' },
 
-    // Sections
     sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#999', marginBottom: 10, marginLeft: 5 },
     menuContainer: {
         backgroundColor: '#FFFFFF',
@@ -321,7 +384,6 @@ const styles = StyleSheet.create({
     menuSubtitle: { fontSize: 12, color: '#999' },
     divider: { height: 1, backgroundColor: '#F5F5F5', marginLeft: 68 },
 
-    // Logout
     logoutButton: {
         flexDirection: 'row',
         backgroundColor: '#FFF0F0',
@@ -334,7 +396,6 @@ const styles = StyleSheet.create({
     logoutText: { color: '#FE5F5F', fontWeight: 'bold', fontSize: 16 },
     versionText: { textAlign: 'center', color: '#CCC', fontSize: 12, marginBottom: 30 },
 
-    // Modal Styles (Consistente con OrdenesScreen)
     modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: {
         backgroundColor: 'white',
@@ -353,7 +414,7 @@ const styles = StyleSheet.create({
     },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 8, textAlign: 'center' },
     modalSubtitle: { fontSize: 13, color: '#999', marginBottom: 25, textAlign: 'center', paddingHorizontal: 20 },
-    
+
     inputContainer: { marginBottom: 15 },
     inputLabel: { fontSize: 12, fontWeight: 'bold', color: '#555', marginBottom: 8 },
     input: {
