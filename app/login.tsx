@@ -35,6 +35,12 @@ export default function LoginScreen() {
             const data = await response.json();
             if (response.ok) {
                 await AsyncStorage.setItem('userToken', data.token);
+                const usuarioData = {
+                    idUsuario: data.idUsuario,
+                    email: email,
+                    rol: data.rol
+                };
+                await AsyncStorage.setItem('userData', JSON.stringify(usuarioData));
                 router.replace('./(tabs)/dashboard');
             } else {
                 Alert.alert('Error de autenticación', data.message || 'Correo o contraseña incorrectos');
@@ -65,7 +71,7 @@ export default function LoginScreen() {
                         contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
-                        bounces={false} 
+                        bounces={false}
                         overScrollMode="never"
                     >
                         <View style={styles.topSection}>
@@ -135,10 +141,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        flexGrow: 1, 
+        flexGrow: 1,
     },
     topSection: {
-        flex: 1, 
+        flex: 1,
         minHeight: 250,
         justifyContent: 'center',
         alignItems: 'center',
@@ -153,7 +159,7 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 50,
         paddingHorizontal: 30,
         paddingTop: 40,
-        paddingBottom: 40, 
+        paddingBottom: 40,
         width: '100%',
     },
     title: {
