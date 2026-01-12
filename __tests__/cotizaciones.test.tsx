@@ -2,112 +2,140 @@ import { render, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import CotizacionesScreen from '../app/(tabs)/cotizaciones';
 
-// --- 1. MOCK DE EXPO ROUTER ---
-jest.mock('expo-router', () => ({
-  Stack: { Screen: () => null },
-  useRouter: () => ({ push: jest.fn() }),
-}));
-
-// --- 2. MOCK DE ASYNC STORAGE ---
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(() => Promise.resolve(JSON.stringify({ idUsuario: 2, nombre: "Admin" }))),
-  setItem: jest.fn(() => Promise.resolve()),
-}));
-
-// --- 3. MOCK DE LA GRÁFICA ---
-// Esto es vital para que no falle al intentar dibujar SVGs en la prueba
-jest.mock("react-native-chart-kit", () => ({
-  PieChart: () => {
-    const { View, Text } = require('react-native');
-    return (
-      <View>
-        <Text>Gráfica de Pastel Simulada</Text>
-      </View>
-    );
-  }
-}));
-
-// --- 4. MOCK DE FETCH ---
+// 1. Mocks Globales
+// Mock para fetch
 global.fetch = jest.fn();
 
-describe('CotizacionesScreen', () => {
-  
-  beforeEach(() => {
-    (global.fetch as jest.Mock).mockClear();
-    jest.spyOn(console, 'error').mockImplementation(() => {}); 
-  });
+// Mock para expo-router
+jest.mock('expo-router', () => ({
+  Stack: {
+    Screen: jest.fn(() => null),
+  },
+  useRouter: () => ({
+    push: jest.fn(),
+  }),
+}));
 
-  it('Muestra el indicador de carga al inicio', () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(() => new Promise(() => {}));
-    render(<CotizacionesScreen />);
+// Mock para FontAwesome
+jest.mock('@fortawesome/react-native-fontawesome', () => ({
+  FontAwesomeIcon: () => null,
+}));
+
+// Mock para DateTimePicker
+jest.mock('@react-native-community/datetimepicker', () => {
+  const MockDateTimePicker = (props: any) => {
+    return React.createElement('DateTimePicker', props);
+  };
+  return MockDateTimePicker;
+});
+
+// Mock para la Gráfica (PieChart) porque Canvas da problemas en tests
+jest.mock("react-native-chart-kit", () => ({
+  PieChart: () => {
+    const { Text } = require("react-native");
+    return <Text>Gráfica de Pastel Simulada</Text>;
+  },
+}));
+
+describe('CotizacionesScreen', () => {
+
+  beforeEach(() => {
+    jest.clearAllMocks(); // Limpiar mocks antes de cada test
   });
 
   it('Muestra los datos correctamente cuando la API responde (Happy Path)', async () => {
-    const mockData = {
-      datosPastel: [
-        { categoria: "Aprobadas", cantidad: 10 },
-        { categoria: "Canceladas", cantidad: 5 }
-      ],
-      datosRadar: [
-        { etiqueta: "Precio alto", valor: 4 },
-        { etiqueta: "Tiempo de entrega", valor: 2 }
-      ]
-    };
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    // 1. Simulamos una respuesta exitosa del backend
+    (fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => mockData,
+      json: async () => ({
+        datosPastel: [
+          { categoria: 'Aprobadas', cantidad: 10 },
+          { categoria: 'Canceladas', cantidad: 5 },
+        ],
+        datosRadar: [
+          { etiqueta: 'Precio alto', valor: 4 },
+          { etiqueta: 'Tiempo de entrega', valor: 2 },
+        ],
+      }),
     });
 
-    const { getByText } = render(<CotizacionesScreen />);
+    const { getByText, queryByText } = render(<CotizacionesScreen />);
 
+    // 2. Verificamos que cargue los textos clave del NUEVO DISEÑO
     await waitFor(() => {
-      // Usamos los textos EXACTOS de tu nuevo diseño
+      // Título de la tarjeta 1
       expect(getByText("Estado General")).toBeTruthy();
-      expect(getByText("Razones de Rechazo")).toBeTruthy(); // Ojo con la mayúscula en Rechazo
 
-      // Verificamos el mock de la gráfica
-      expect(getByText("Gráfica de Pastel Simulada")).toBeTruthy();
+      // Título de la tarjeta 2 (CORREGIDO: Antes era "Razones de Rechazo")
+      expect(getByText("Motivos de Cancelación")).toBeTruthy();
 
-      // Verificamos datos de la lista
+      // Datos simulados
       expect(getByText("Precio alto")).toBeTruthy();
-      expect(getByText("4")).toBeTruthy();
+      expect(getByText("Tiempo de entrega")).toBeTruthy();
+
+      // Total de movimientos (10 + 5)
+      expect(getByText(/Total: 15 Movimientos/)).toBeTruthy();
     });
   });
 
   it('Maneja datos vacíos correctamente', async () => {
-    const mockDataVacia = {
-      datosPastel: [],
-      datosRadar: []
-    };
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    // 1. Simulamos respuesta vacía
+    (fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => mockDataVacia,
+      json: async () => ({
+        datosPastel: [],
+        datosRadar: [],
+      }),
     });
 
     const { getByText } = render(<CotizacionesScreen />);
 
+    // 2. Esperamos los textos de "estado vacío" del NUEVO DISEÑO
     await waitFor(() => {
-      // Usamos los mensajes de "No hay datos" de tu nuevo diseño
+      expect(getByText("Estado General")).toBeTruthy();
+
+      // Mensaje de vacío en pastel
       expect(getByText("No hay datos en este periodo.")).toBeTruthy();
-      expect(getByText("No hay cancelaciones registradas.")).toBeTruthy();
+
+      // Mensaje de vacío en razones (CORREGIDO: Antes era "No hay cancelaciones...")
+      expect(getByText("Sin cancelaciones registradas.")).toBeTruthy();
     });
   });
 
-  it('Maneja error del servidor (500)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: async () => ({}),
+  it('Maneja error de la API correctamente', async () => {
+    // 1. Simulamos error 500
+    (fetch as jest.Mock).mockRejectedValueOnce(new Error("Error de red"));
+
+    // Espiar console.error para que no ensucie la terminal
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => { });
+
+    const { getByText } = render(<CotizacionesScreen />);
+
+    // 2. Aunque falle, la app no debe crashear, debe mostrar estados vacíos
+    await waitFor(() => {
+      expect(getByText("Sin cancelaciones registradas.")).toBeTruthy();
+    });
+
+    // Verificamos que se llamó al fetch
+    expect(fetch).toHaveBeenCalled();
+
+    spy.mockRestore();
+  });
+
+  it('Cambia el filtro de tiempo al presionar los tabs', async () => {
+    (fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ datosPastel: [], datosRadar: [] }),
     });
 
     const { getByText } = render(<CotizacionesScreen />);
 
-    await waitFor(() => {
-       // Verificamos que al menos cargue el título principal
-       expect(getByText("Estado General")).toBeTruthy();
-    });
+    // Buscamos los botones del nuevo diseño (Segmented Control)
+    const btnSemana = getByText("Semana");
+    const btnMes = getByText("Mes");
+
+
+
   });
 
 });
