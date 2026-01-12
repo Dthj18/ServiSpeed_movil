@@ -1,5 +1,6 @@
 import { render, waitFor } from '@testing-library/react-native';
 import React from 'react';
+// Asegúrate de que esta ruta sea la correcta hacia tu archivo
 import CotizacionesScreen from '../app/(tabs)/cotizaciones';
 
 // --- 1. MOCK DE EXPO ROUTER ---
@@ -15,7 +16,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 // --- 3. MOCK DE LA GRÁFICA ---
-// Esto es vital para que no falle al intentar dibujar SVGs en la prueba
+// Usamos require dentro para evitar errores de referencia
 jest.mock("react-native-chart-kit", () => ({
   PieChart: () => {
     const { View, Text } = require('react-native');
@@ -27,18 +28,34 @@ jest.mock("react-native-chart-kit", () => ({
   }
 }));
 
-// --- 4. MOCK DE FETCH ---
+// --- 4. MOCK DE ICONOS (FontAwesome) ---
+// NECESARIO: Si no mockeas esto, la prueba falla al intentar renderizar el ícono SVG
+jest.mock('@fortawesome/react-native-fontawesome', () => ({
+  FontAwesomeIcon: () => null,
+}));
+
+// --- 5. MOCK DE DATETIMEPICKER ---
+// NECESARIO: Usamos require('react') dentro para evitar "Invalid variable access: React"
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const MockDateTimePicker = (props: any) => {
+    return React.createElement('View', null);
+  };
+  return MockDateTimePicker;
+});
+
+// --- 6. MOCK DE FETCH ---
 global.fetch = jest.fn();
 
 describe('CotizacionesScreen', () => {
-  
+
   beforeEach(() => {
     (global.fetch as jest.Mock).mockClear();
-    jest.spyOn(console, 'error').mockImplementation(() => {}); 
+    jest.spyOn(console, 'error').mockImplementation(() => { });
   });
 
   it('Muestra el indicador de carga al inicio', () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(() => new Promise(() => {}));
+    (global.fetch as jest.Mock).mockImplementationOnce(() => new Promise(() => { }));
     render(<CotizacionesScreen />);
   });
 
@@ -62,9 +79,11 @@ describe('CotizacionesScreen', () => {
     const { getByText } = render(<CotizacionesScreen />);
 
     await waitFor(() => {
-      // Usamos los textos EXACTOS de tu nuevo diseño
+      // Títulos principales
       expect(getByText("Estado General")).toBeTruthy();
-      expect(getByText("Razones de Rechazo")).toBeTruthy(); // Ojo con la mayúscula en Rechazo
+
+      // CAMBIO IMPORTANTE: Actualizado al nuevo texto del diseño
+      expect(getByText("Motivos de Cancelación")).toBeTruthy();
 
       // Verificamos el mock de la gráfica
       expect(getByText("Gráfica de Pastel Simulada")).toBeTruthy();
@@ -89,9 +108,11 @@ describe('CotizacionesScreen', () => {
     const { getByText } = render(<CotizacionesScreen />);
 
     await waitFor(() => {
-      // Usamos los mensajes de "No hay datos" de tu nuevo diseño
+      // Mensajes de estado vacío del NUEVO diseño
       expect(getByText("No hay datos en este periodo.")).toBeTruthy();
-      expect(getByText("No hay cancelaciones registradas.")).toBeTruthy();
+
+      // CAMBIO IMPORTANTE: Actualizado de "No hay cancelaciones..." a "Sin cancelaciones..."
+      expect(getByText("Sin cancelaciones registradas.")).toBeTruthy();
     });
   });
 
@@ -105,8 +126,11 @@ describe('CotizacionesScreen', () => {
     const { getByText } = render(<CotizacionesScreen />);
 
     await waitFor(() => {
-       // Verificamos que al menos cargue el título principal
-       expect(getByText("Estado General")).toBeTruthy();
+      // Verificamos que al menos cargue el título principal
+      expect(getByText("Estado General")).toBeTruthy();
+
+      // Al fallar, debería mostrar el estado vacío o mensaje por defecto
+      expect(getByText("Sin cancelaciones registradas.")).toBeTruthy();
     });
   });
 
