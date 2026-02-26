@@ -1,23 +1,96 @@
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import { faBell } from '@fortawesome/free-regular-svg-icons';
-import { faChartSimple, faClipboardList, faFileInvoiceDollar, faWallet } from '@fortawesome/free-solid-svg-icons';
+import { faArrowRight, faChartSimple, faClipboardList, faFileInvoiceDollar, faWallet } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { router, Stack } from 'expo-router';
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { router, Stack, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from "react";
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const screenWidth = Dimensions.get("window").width;
+
+interface DashboardResumen {
+    cotizacionesMes: number;
+    ordenesActivas: number;
+    pagosPendientes: number;
+}
+
+interface FinanzasDTO {
+    montoPagado: number;
+    datosGrafica: any[];
+}
+
 export default function DashboardScreen() {
 
-    const barData: any = [
-        { value: 11000, label: 'Lun', frontColor: '#92B2FD', spacing: 20 },
-        { value: 6000, label: 'Mar', frontColor: '#92B2FD' },
-        { value: 8000, label: 'Mie', frontColor: '#92B2FD' },
-        { value: 16000, label: 'Jue', frontColor: '#FF8E9B' },
-        { value: 2000, label: 'Vie', frontColor: '#92B2FD' },
-        { value: 7500, label: 'Sab', frontColor: '#FF8E9B' },
-    ];
+    const [filtroTiempo, setFiltroTiempo] = useState('Semana');
+
+    const [resumen, setResumen] = useState<DashboardResumen>({
+        cotizacionesMes: 0,
+        ordenesActivas: 0,
+        pagosPendientes: 0
+
+    });
+
+    const [finanzas, setFinanzas] = useState<FinanzasDTO>({
+        montoPagado: 0,
+        datosGrafica: []
+    });
+
+    const fetchDashboardData = async () => {
+        try {
+            const response = await fetch('http://10.0.0.1:8082/api/dashboard/resumen');
+
+            if (response.ok) {
+                const data = await response.json();
+                setResumen(data);
+            } else {
+                console.error("Error al obtener datos del dashboard");
+            }
+        } catch (error) {
+            console.error("Error de red: ", error);
+        }
+    };
+
+    const fetchFinanzas = async () => {
+        try {
+            const response = await fetch(`http://10.0.0.1:8082/api/dashboard/finanzas?filtro=${filtroTiempo}`);
+            if (response.ok) {
+                const data = await response.json();
+                setFinanzas(data);
+            }
+        } catch (error) {
+            console.error("Error finanzas:", error);
+        }
+    };
+    useFocusEffect(
+        useCallback(() => {
+            fetchDashboardData();
+            fetchFinanzas();
+        }, [filtroTiempo])
+    );
+
+    const formatoMoneda = (cantidad: any) => {
+        if (cantidad === null || cantidad === undefined) return "$0.00";
+        const numero = Number(cantidad);
+        if (isNaN(numero)) return "$0.00";
+        return new Intl.NumberFormat('es-MX', {
+            style: 'currency',
+            currency: 'MXN'
+        }).format(numero);
+    };
+
+
+    const BotonFiltro = ({ texto }: { texto: string }) => (
+        <TouchableOpacity
+            style={[styles.periodButton, filtroTiempo === texto && styles.periodButtonActive]}
+            onPress={() => setFiltroTiempo(texto)}
+        >
+            <Text style={[styles.periodText, filtroTiempo === texto && styles.periodTextActive]}>
+                {texto}
+            </Text>
+        </TouchableOpacity>
+    );
 
     return (
         <>
@@ -44,84 +117,109 @@ export default function DashboardScreen() {
                 }}
             />
 
-            <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+            <SafeAreaView style={styles.container} edges={['left', 'right']}>
                 <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
 
                     <View style={styles.cardsGrid}>
-                        
-                        <TouchableOpacity style={styles.card} onPress={() => router.push('/(tabs)/cotizaciones')}>
+                        <TouchableOpacity
+                            style={[styles.card, { backgroundColor: '#5C7CFA' }]}
+                            onPress={() => router.push('/(tabs)/cotizaciones')}
+                        >
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { borderColor: '#5C7CFA' }]}>
-                                    <FontAwesomeIcon icon={faFileInvoiceDollar as IconProp} size={20} color="#5C7CFA" />
+                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                    <FontAwesomeIcon icon={faFileInvoiceDollar as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.cardValue}>13</Text>
+                                <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>{resumen.cotizacionesMes}</Text>
                             </View>
-                            <Text style={styles.cardLabel}>Total cotizaciones</Text>
+                            <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Total cotizaciones</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.card} onPress={() => router.push('/(tabs)/ordenes')}>
+                        <TouchableOpacity
+                            style={[styles.card, { backgroundColor: '#4dabf7' }]}
+                            onPress={() => router.push('/(tabs)/ordenes')}
+                        >
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { borderColor: '#4dabf7' }]}>
-                                    <FontAwesomeIcon icon={faClipboardList as IconProp} size={20} color="#4dabf7" />
+                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                    <FontAwesomeIcon icon={faClipboardList as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.cardValue}>06</Text>
+                                <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>{resumen.ordenesActivas}</Text>
                             </View>
-                            <Text style={styles.cardLabel}>Total órdenes</Text>
+                            <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Total órdenes</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.card} onPress={() => router.push('/(tabs)/estadisticas')}>
+                        <TouchableOpacity style={[styles.card, { backgroundColor: '#333333' }]}>
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { borderColor: '#4CAF50' }]}>
-                                    <FontAwesomeIcon icon={faChartSimple as IconProp} size={20} color="#4CAF50" />
+                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                    <FontAwesomeIcon icon={faWallet as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <FontAwesomeIcon icon={faChartSimple as IconProp} size={24} color="#4CAF50" style={{marginLeft: 10, opacity: 0.5}}/>
+                                <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>{resumen.pagosPendientes}</Text>
                             </View>
-                            <Text style={styles.cardLabel}>Estadísticas</Text>
+                            <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Pagos pendientes</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.card}>
+                        <TouchableOpacity
+                            style={[styles.card, { backgroundColor: '#20C997' }]}
+                            onPress={() => router.push('/(tabs)/estadisticas')}
+                        >
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { borderColor: '#333' }]}>
-                                    <FontAwesomeIcon icon={faWallet as IconProp} size={20} color="#333" />
+                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                    <FontAwesomeIcon icon={faChartSimple as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.cardValue}>03</Text>
+                                <FontAwesomeIcon icon={faArrowRight as IconProp} size={20} color="#FFFFFF" />
                             </View>
-                            <Text style={styles.cardLabel}>Pagos pendientes</Text>
+                            <Text style={[styles.cardLabel, { color: '#FFFFFF', fontWeight: '700' }]}>Ver Reportes</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.financesHeader}>
-                        <Text style={styles.sectionTitle}>Finanzas</Text>
-                        
-                        <View style={styles.periodSelector}>
-                            <TouchableOpacity style={styles.periodButton}>
-                                <Text style={styles.periodText}>Hoy</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.periodButton, styles.periodButtonActive]}>
-                                <Text style={styles.periodTextActive}>Semana</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.periodButton}>
-                                <Text style={styles.periodText}>Mes</Text>
-                            </TouchableOpacity>
+                    {/* === SECCIÓN FINANZAS === */}
+                    <View style={styles.financeCard}>
+
+                        <View style={styles.financeHeaderRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.sectionTitle}>Finanzas</Text>
+                                {/* TOTAL DINÁMICO */}
+                                <Text style={styles.totalAmount} numberOfLines={1} adjustsFontSizeToFit>
+                                    {formatoMoneda(finanzas.montoPagado)}
+                                </Text>
+                            </View>
+
+                            <View style={styles.periodSelector}>
+                                <BotonFiltro texto="Hoy" />
+                                <BotonFiltro texto="Semana" />
+                                <BotonFiltro texto="Mes" />
+                            </View>
                         </View>
-                    </View>
 
-                    <View style={styles.chartContainer}>
-                        <BarChart
-                            data={barData}
-                            barWidth={18}
-                            noOfSections={4}
-                            barBorderRadius={4}
-                            frontColor="lightgray"
-                            yAxisThickness={0}
-                            xAxisThickness={0}
-                            yAxisTextStyle={{color: '#999', fontSize: 10}}
-                            xAxisLabelTextStyle={{color: '#999', fontSize: 10}}
-                            height={220}
-                            width={300} 
-                            isAnimated
-                            hideRules
-                        />
+                        <View style={styles.chartWrapper}>
+                            {/* GRÁFICA DINÁMICA */}
+                            {finanzas.datosGrafica.length > 0 ? (
+                                <BarChart
+                                    key={JSON.stringify(finanzas.datosGrafica)}
+                                    data={finanzas.datosGrafica}
+                                    rulesLength={screenWidth - 120}
+                                    barWidth={22}
+                                    barBorderTopLeftRadius={4}
+                                    barBorderTopRightRadius={4}
+                                    frontColor="#5C7CFA"
+                                    spacing={finanzas.datosGrafica.length <= 4 ? 50 : 25}
+                                    initialSpacing={20}
+                                    yAxisThickness={0}
+                                    xAxisThickness={0}
+                                    yAxisTextStyle={{ color: '#9CA3AF', fontSize: 11 }}
+                                    xAxisLabelTextStyle={{ color: '#6B7280', fontSize: 11, fontWeight: '500', marginTop: 4 }}
+                                    hideRules={false}
+                                    rulesType="dashed"
+                                    rulesColor="#E5E7EB"
+                                    height={230}
+                                    isAnimated
+                                    animationDuration={400}
+                                />
+                            ) : (
+                                <View style={{ height: 220, justifyContent: 'center', alignItems: 'center' }}>
+                                    <Text style={{ color: '#999' }}>Cargando datos...</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
 
                 </ScrollView>
@@ -138,17 +236,16 @@ const styles = StyleSheet.create({
     scrollContainer: {
         paddingHorizontal: 20,
         paddingTop: 10,
-        paddingBottom: 100, 
+        paddingBottom: 30,
     },
     cardsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: 30,
+        marginBottom: 10,
     },
     card: {
-        width: '48%', 
-        backgroundColor: '#F5F5F5', 
+        width: '48%',
         borderRadius: 20,
         padding: 20,
         marginBottom: 15,
@@ -158,14 +255,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: 15,
+        justifyContent: 'flex-start',
     },
     iconCircle: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#DDD', 
+        backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 10,
@@ -174,53 +270,72 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: 'bold',
         fontFamily: 'LexendTera-SemiBold',
-        color: '#000',
     },
     cardLabel: {
         fontSize: 12,
-        color: '#666',
+        opacity: 0.9,
         fontWeight: '500',
     },
-    financesHeader: {
+
+    // ESTILOS DE FINANZAS
+    financeCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 20,
+        marginTop: 10,
+        marginBottom: 10,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: '#F3F4F6'
+    },
+    financeHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: 20,
     },
     sectionTitle: {
-        fontSize: 15, 
+        fontSize: 14,
+        color: '#6B7280',
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    totalAmount: {
+        fontSize: 20,
         fontWeight: 'bold',
+        color: '#111827',
         fontFamily: 'LexendTera-SemiBold',
-        color: '#333',
     },
     periodSelector: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#EEE',
-        borderRadius: 20,
-        padding: 2,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        padding: 5,
+        marginLeft: 1,
     },
     periodButton: {
         paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 18,
+        paddingHorizontal: 9,
+        borderRadius: 8,
     },
     periodButtonActive: {
-        backgroundColor: '#FFFFFF', 
-        shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 1,
+        backgroundColor: '#FFFFFF',
+        shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1,
     },
     periodText: {
-        fontSize: 11,
-        color: '#999',
+        fontSize: 10,
+        color: '#6B7280',
+        fontWeight: '500',
     },
     periodTextActive: {
-        fontSize: 11,
-        color: '#000',
-        fontWeight: 'bold',
+        color: '#111827',
+        fontWeight: '700',
     },
-    chartContainer: {
+    chartWrapper: {
         alignItems: 'center',
-        marginTop: 10,
-    },
+    }
 });
