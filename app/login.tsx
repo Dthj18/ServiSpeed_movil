@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -58,8 +58,11 @@ export default function LoginScreen() {
         <>
             <Stack.Screen options={{ headerShown: false }} />
             <View style={styles.container}>
+                {/* FONDO DINÁMICO: Un gradiente elegante y moderno que conecta con el color principal de la app */}
                 <LinearGradient
-                    colors={['#7EE2B5', '#457C63']}
+                    colors={['#1E3A8A', '#3A88F6', '#60A5FA']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                 />
 
@@ -74,6 +77,7 @@ export default function LoginScreen() {
                         bounces={false}
                         overScrollMode="never"
                     >
+                        {/* SECCIÓN DEL LOGO */}
                         <View style={styles.topSection}>
                             <Image
                                 source={require('../assets/images/logo.png')}
@@ -82,21 +86,25 @@ export default function LoginScreen() {
                             />
                         </View>
 
+                        {/* SECCIÓN DEL FORMULARIO */}
                         <View style={styles.bottomSection}>
-                            <Text style={styles.title}>Login</Text>
+                            <View style={styles.dragIndicator} />
+                            
+                            <Text style={styles.title}>Bienvenido</Text>
+                            <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
 
                             <View style={styles.inputContainer}>
                                 <FontAwesomeIcon
                                     icon={faEnvelope}
                                     style={styles.inputIcon}
-                                    size={20}
+                                    size={18}
                                 />
                                 <TextInput
                                     placeholder={"Correo Electrónico"}
                                     value={email}
                                     onChangeText={setEmail}
                                     style={styles.input}
-                                    placeholderTextColor="#666"
+                                    placeholderTextColor="#9CA3AF"
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                 />
@@ -106,27 +114,29 @@ export default function LoginScreen() {
                                 <FontAwesomeIcon
                                     icon={faKey}
                                     style={styles.inputIcon}
-                                    size={20}
+                                    size={18}
                                 />
                                 <TextInput
                                     placeholder={"Contraseña"}
                                     value={password}
                                     onChangeText={setPassword}
                                     style={styles.input}
-                                    placeholderTextColor="#666"
+                                    placeholderTextColor="#9CA3AF"
                                     secureTextEntry={true}
                                 />
                             </View>
 
-                            <TouchableOpacity onPress={handleLogin} style={styles.loginButtonWrapper}>
-                                <LinearGradient
-                                    colors={["#7EE2B585", "#457C6385"]}
-                                    style={styles.loginButtonGradient}
-                                >
-                                    <Text style={styles.loginButtonText}>
-                                        {loading ? "Cargando..." : "Iniciar Sesión"}
-                                    </Text>
-                                </LinearGradient>
+                            <TouchableOpacity 
+                                onPress={handleLogin} 
+                                style={styles.loginButton}
+                                activeOpacity={0.8}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                                )}
                             </TouchableOpacity>
                         </View>
                     </ScrollView>
@@ -142,64 +152,96 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
+        justifyContent: 'space-between',
     },
     topSection: {
         flex: 1,
-        minHeight: 250,
+        minHeight: 280,
         justifyContent: 'center',
         alignItems: 'center',
     },
     logo: {
-        width: 180,
-        height: 180,
+        width: 200,
+        height: 200,
+        // Opcional: Agregarle un poco de sombra al logo para que resalte sobre el gradiente
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
     },
     bottomSection: {
-        backgroundColor: "#E2E2E2",
-        borderTopLeftRadius: 50,
-        borderTopRightRadius: 50,
+        backgroundColor: "#FFFFFF", // Blanco limpio como en las otras pantallas
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
         paddingHorizontal: 30,
-        paddingTop: 40,
-        paddingBottom: 40,
+        paddingTop: 20,
+        paddingBottom: 50,
         width: '100%',
+        // Sombra superior para dar profundidad
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -5 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    dragIndicator: {
+        width: 50,
+        height: 5,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 5,
+        alignSelf: 'center',
+        marginBottom: 25,
     },
     title: {
-        color: "#000000",
-        fontSize: 36,
+        fontFamily: "LexendTera-SemiBold", // Integración de tu fuente moderna
+        color: "#1F2937", // Gris oscuro elegante
+        fontSize: 28,
+        marginBottom: 5,
+    },
+    subtitle: {
+        fontSize: 14,
+        color: "#6B7280",
         marginBottom: 30,
-        marginLeft: 10,
+        fontWeight: '500',
     },
     inputContainer: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#FFFFFF",
-        borderRadius: 21,
-        marginBottom: 15,
-        height: 50,
-        paddingHorizontal: 15,
+        backgroundColor: "#F9FAFB", // Gris súper claro
+        borderRadius: 14, // Radio de 14 igual a las tarjetas de órdenes
+        marginBottom: 16,
+        height: 55,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderColor: "#E5E7EB", // Borde sutil
     },
     input: {
-        color: "#000000",
+        color: "#1F2937",
         fontSize: 14,
         flex: 1,
-        marginLeft: 10,
+        marginLeft: 12,
         height: '100%',
+        fontWeight: '500',
     },
     inputIcon: {
-        opacity: 0.3,
+        color: "#3A88F6", // Íconos en el azul principal de tu app
     },
-    loginButtonWrapper: {
-        borderRadius: 21,
-        marginTop: 25,
-        overflow: 'hidden',
-        marginBottom: 20,
-    },
-    loginButtonGradient: {
-        alignItems: "center",
-        paddingVertical: 15,
+    loginButton: {
+        backgroundColor: '#3A88F6', // Color sólido primario igual al de "Ver Historial"
+        borderRadius: 14,
+        height: 55,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 20,
+        shadowColor: "#3A88F6",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        elevation: 4,
     },
     loginButtonText: {
-        color: "#000000",
-        fontSize: 16,
-        fontWeight: '500',
+        color: "#FFFFFF",
+        fontFamily: "LexendTera-SemiBold",
+        fontSize: 15,
     },
 });
