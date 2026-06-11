@@ -1,14 +1,29 @@
 import {
-    faBoxOpen, faCheckCircle,
+    faBoxOpen,
+    faCheckCircle,
     faChevronLeft,
-
-    faCircleInfo, faClipboardList, faDollarSign,
-    faPalette, faPaperPlane, faPencilAlt, faPrint, faThumbsDown, faThumbsUp, faUser
+    faCircleInfo,
+    faClipboardList,
+    faDollarSign,
+    faPalette,
+    faPaperPlane,
+    faPencilAlt,
+    faPrint,
+    faThumbsDown,
+    faThumbsUp,
+    faUser
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 
 const DICCIONARIO_ESTATUS: Record<string, { color: string, icono: any }> = {
     'COT_INICIADA':      { color: '#FFB300', icono: faClipboardList }, 
@@ -29,11 +44,16 @@ const obtenerEstiloEstatus = (clave: string) => {
 };
 
 interface MovimientoTracker {
-    idMovimiento: string;
+    idMovimiento: string | number;
     claveEstatus: string;
-    titulo: string;
-    fechaStr: string;
-    nombreEncargado: string;
+    titulo?: string;
+    descripcion?: string; // Respaldo por si viene como descripción
+    estatus?: string;     // Respaldo por si viene como estatus
+    fechaStr?: string;
+    fecha?: string;       // Respaldo por si viene como fecha corta o ISO
+    nombreEncargado?: string;
+    encargado?: string;   // Respaldo alternativo
+    usuario?: string;     // Respaldo alternativo
 }
 
 export default function TrackerScreen() {
@@ -73,16 +93,22 @@ export default function TrackerScreen() {
                     headerShown: true,
                     headerTitle: "Seguimiento de Orden",
                     headerTitleAlign: 'center',
-                    headerTitleStyle: { fontFamily: "LexendTera-SemiBold", fontSize: 16 },
+                    headerTitleStyle: { 
+                        fontFamily: "LexendTera-SemiBold", 
+                        fontSize: 16 
+                    },
                     headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
-                    // 3. BOTÓN DE REGRESAR AGREGADO AQUÍ:
                     headerLeft: () => (
                         <TouchableOpacity 
                             onPress={() => router.back()} 
-                            style={{ paddingRight: 20, paddingVertical: 10 }}
+                            style={styles.backButton}
                         >
-                            <FontAwesomeIcon icon={faChevronLeft} size={20} color="#333333" />
+                            <FontAwesomeIcon 
+                                icon={faChevronLeft} 
+                                size={20} 
+                                color="#333333" 
+                            />
                         </TouchableOpacity>
                     ),
                 }}
@@ -96,38 +122,75 @@ export default function TrackerScreen() {
             </View>
 
             {loading ? (
-                <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 40 }} />
+                <ActivityIndicator 
+                    size="large" 
+                    color="#3A88F6" 
+                    style={styles.loader} 
+                />
             ) : historial.length === 0 ? (
-                <Text style={{ textAlign: 'center', color: '#999', marginTop: 40, paddingHorizontal: 20 }}>
+                <Text style={styles.emptyText}>
                     No se encontró historial para esta orden.
                 </Text>
             ) : (
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <ScrollView 
+                    contentContainerStyle={styles.scrollContent} 
+                    showsVerticalScrollIndicator={false}
+                >
                     {historial.map((item, index) => {
                         const isLast = index === historial.length - 1;
                         const estilo = obtenerEstiloEstatus(item.claveEstatus);
                         const colorPastel = estilo.color + '08';
 
-                        return (
-                            <View key={item.idMovimiento || index.toString()} style={styles.timelineRow}>
+                        // Mapeos inteligentes para prevenir que los textos salgan vacíos
+                        const textoTitulo = item.titulo || item.descripcion || item.estatus || "Cambio de Estado";
+                        const textoFecha = item.fechaStr || item.fecha || "Fecha no registrada";
+                        const textoEncargado = item.nombreEncargado || item.encargado || item.usuario || "Sistema";
 
+                        return (
+                            <View 
+                                key={item.idMovimiento || index.toString()} 
+                                style={styles.timelineRow}
+                            >
+                                {/* LÍNEA GRÁFICA DE TIEMPO */}
                                 <View style={styles.timelineGraphic}>
                                     <View style={[styles.iconCircle, { backgroundColor: estilo.color }]}>
-                                        <FontAwesomeIcon icon={estilo.icono} size={14} color="#FFF" />
+                                        <FontAwesomeIcon 
+                                            icon={estilo.icono} 
+                                            size={14} 
+                                            color="#FFF" 
+                                        />
                                     </View>
                                     {!isLast && <View style={styles.verticalLine} />}
                                 </View>
 
-                                <View style={[styles.cardContainer, { backgroundColor: colorPastel, borderColor: estilo.color + '15' }]}>
-                                    <Text style={[styles.cardTitle, { color: estilo.color }]}>{item.titulo}</Text>
-                                    <Text style={styles.cardDate}>{item.fechaStr}</Text>
+                                {/* TARJETA DE INFORMACIÓN */}
+                                <View style={[
+                                    styles.cardContainer, 
+                                    { 
+                                        backgroundColor: colorPastel, 
+                                        borderColor: estilo.color + '15' 
+                                    }
+                                ]}>
+                                    <Text style={[styles.cardTitle, { color: estilo.color }]}>
+                                        {textoTitulo}
+                                    </Text>
+                                    
+                                    <Text style={styles.cardDate}>
+                                        {textoFecha}
+                                    </Text>
 
                                     <View style={styles.userContainer}>
-                                        <FontAwesomeIcon icon={faUser} size={10} color="#3A88F6" style={{ marginRight: 6 }} />
-                                        <Text style={styles.cardUser}>Atendió: {item.nombreEncargado}</Text>
+                                        <FontAwesomeIcon 
+                                            icon={faUser} 
+                                            size={10} 
+                                            color="#3A88F6" 
+                                            style={styles.userIcon} 
+                                        />
+                                        <Text style={styles.cardUser}>
+                                            Atendió: {textoEncargado}
+                                        </Text>
                                     </View>
                                 </View>
-
                             </View>
                         );
                     })}
@@ -141,6 +204,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#FFFFFF"
+    },
+    backButton: {
+        paddingRight: 20, 
+        paddingVertical: 10
     },
     headerInfo: {
         paddingHorizontal: 20,
@@ -162,6 +229,15 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#3A88F6',
         fontWeight: 'bold',
+    },
+    loader: {
+        marginTop: 40
+    },
+    emptyText: {
+        textAlign: 'center', 
+        color: '#999', 
+        marginTop: 40, 
+        paddingHorizontal: 20
     },
     scrollContent: {
         paddingHorizontal: 20,
@@ -222,6 +298,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         borderRadius: 8,
         alignSelf: 'flex-start',
+    },
+    userIcon: {
+        marginRight: 6
     },
     cardUser: {
         fontSize: 12,
