@@ -1,7 +1,7 @@
 import { faBoxOpen, faCalendarDays, faClock, faFileInvoiceDollar, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -21,6 +21,7 @@ interface OrdenCard {
 }
 
 export default function OrdenesScreen() {
+    const router = useRouter();
 
     const [ordenes, setOrdenes] = useState<OrdenCard[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,7 +34,6 @@ export default function OrdenesScreen() {
 
     const [modalDetalleVisible, setModalDetalleVisible] = useState(false);
     const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCard | null>(null);
-    const [verHistorialCompleto, setVerHistorialCompleto] = useState(false);
 
 
     const fetchOrdenes = async () => {
@@ -158,8 +158,6 @@ export default function OrdenesScreen() {
                             <Text style={{ color: '#FF5555', fontWeight: 'bold' }}>Reestablecer</Text>
                         </TouchableOpacity>
                     </View>
-
-
                 )}
 
                 <ScrollView
@@ -289,46 +287,16 @@ export default function OrdenesScreen() {
 
                                     {listaProductos.length > 0 ? (
                                         <View style={{ marginTop: 5, maxHeight: 120 }}>
-
-                                            <ScrollView
-                                                nestedScrollEnabled={true}
-                                                showsVerticalScrollIndicator={true}
-                                                contentContainerStyle={{ paddingRight: 5 }}
-                                            >
+                                            <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingRight: 5 }}>
                                                 {listaProductos.map((item: any, index: number) => (
                                                     <View key={index} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
-
-                                                        {/* COLUMNA 1: Cantidad */}
-                                                        <Text style={{
-                                                            width: 45,
-                                                            textAlign: 'right',
-                                                            fontWeight: '600',
-                                                            color: '#333',
-                                                            fontSize: 13,
-                                                            marginTop: 2
-                                                        }}>
+                                                        <Text style={{ width: 45, textAlign: 'right', fontWeight: '600', color: '#333', fontSize: 13, marginTop: 2 }}>
                                                             {item.cantidad}
                                                         </Text>
-
-                                                        {/* COLUMNA 2: Separador */}
-                                                        <Text style={{
-                                                            width: 25,
-                                                            textAlign: 'center',
-                                                            color: '#999',
-                                                            fontSize: 13,
-                                                            marginTop: 2
-                                                        }}>
+                                                        <Text style={{ width: 25, textAlign: 'center', color: '#999', fontSize: 13, marginTop: 2 }}>
                                                             x
                                                         </Text>
-
-                                                        {/* COLUMNA 3: Descripción */}
-                                                        <Text style={{
-                                                            flex: 1,
-                                                            flexWrap: 'wrap',
-                                                            color: '#555',
-                                                            fontSize: 14,
-                                                            lineHeight: 20
-                                                        }}>
+                                                        <Text style={{ flex: 1, flexWrap: 'wrap', color: '#555', fontSize: 14, lineHeight: 20 }}>
                                                             {item.descripcion}
                                                         </Text>
                                                     </View>
@@ -395,6 +363,20 @@ export default function OrdenesScreen() {
                                     ${ordenSeleccionada?.montoTotal?.toFixed(2)}
                                 </Text>
                             </View>
+
+                            {/* BOTÓN NUEVO: VER HISTORIAL DE LA ORDEN */}
+                            <TouchableOpacity
+                                style={[styles.closeButtonFull, { backgroundColor: '#3A88F6', marginBottom: 10 }]}
+                                onPress={() => {
+                                    setModalDetalleVisible(false);
+                                    router.push({
+                                        pathname: "/tracker" as any,
+                                        params: { idOrden: ordenSeleccionada?.idOrden }
+                                    });
+                                }}
+                            >
+                                <Text style={[styles.closeButtonText, { color: '#FFF' }]}>Ver Historial de la Orden</Text>
+                            </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={styles.closeButtonFull}
