@@ -1,6 +1,7 @@
+import { apiFetch } from '@/services/apiClient';
+import { saveSession } from '@/services/session';
 import { faEnvelope, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -21,34 +22,25 @@ export default function LoginScreen() {
         setLoading(true);
 
         try {
-            const response = await fetch('http://10.0.0.1:8089/auth/login', {
+            const data = await apiFetch('/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: email,
-                    password: password,
-                }),
+                skipAuth: true,
+                body: { email, password },
             });
 
-            const data = await response.json();
-            if (response.ok) {
-                await AsyncStorage.setItem('userToken', data.token);
-                const usuarioData = {
-                    idUsuario: data.idUsuario,
-                    email: email,
-                    rol: data.rol
-                };
-                await AsyncStorage.setItem('userData', JSON.stringify(usuarioData));
-                router.replace('./(tabs)/dashboard');
-            } else {
-                Alert.alert('Error de autenticación', data.message || 'Correo o contraseña incorrectos');
-            }
+            await saveSession(data.token, {
+                idUsuario: data.idUsuario,
+                email: email,
+                rol: data.rol,
+                permisos: data.permisos,
+            });
 
-        } catch (error) {
-            console.error(error);
-            Alert.alert("Error", "Ocurrió un error en el inicio de sesión");
+            router.replace('/(tabs)/dashboard');
+        } catch (error: any) {
+            console.log('Error completo:', error);
+            console.log('Error message:', error.message);
+            console.log('Error name:', error.name);
+            Alert.alert('Error de autenticación', error.body?.message || 'Correo o contraseña incorrectos');
         } finally {
             setLoading(false);
         }
