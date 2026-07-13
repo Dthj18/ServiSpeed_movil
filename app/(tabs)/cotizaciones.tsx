@@ -19,7 +19,10 @@ import { PieChart } from "react-native-chart-kit";
 
 const screenWidth = Dimensions.get("window").width;
 
+type Periodo = 'dia' | 'semana' | 'mes' | 'anio';
+
 export default function CotizacionesScreen() {
+    const ID_USUARIO = 2;
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -27,10 +30,48 @@ export default function CotizacionesScreen() {
     const [razonesData, setRazonesData] = useState<any[]>([]);
     const [totalMovimientos, setTotalMovimientos] = useState(0);
 
-    const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
+    const [fechaBase, setFechaBase] = useState<Date>(new Date());
+    const [periodo, setPeriodo] = useState<Periodo>('dia');
     const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
-    const ID_USUARIO = 2;
+    const formatDateISO = (date: Date) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const getRangoFechas = (date: Date, tipo: any) => {
+        const inicio = new Date(date);
+        const fin = new Date(date);
+        inicio.setHours(0, 0, 0, 0);
+        fin.setHours(23, 59, 59, 999);
+
+        if (tipo === 'semana') {
+            const diaSemana = inicio.getDay() || 7;
+            inicio.setDate(inicio.getDate() - diaSemana + 1);
+            fin.setDate(inicio.getDate() + (7 - diaSemana));
+        } else if (tipo === 'mes') {
+            inicio.setDate(1);
+            fin.setMonth(fin.getMonth() + 1, 0);
+        } else if (tipo === 'anio') {
+            inicio.setMonth(0, 1);
+            fin.setMonth(11, 31);
+        }
+        return { inicio, fin };
+    };
+
+    const getTextoRango = () => {
+        const { inicio, fin } = getRangoFechas(fechaBase, periodo);
+        const optsDia: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+        const optsMes: Intl.DateTimeFormatOptions = { month: 'long', year: 'numeric' };
+
+        if (periodo === 'dia') return inicio.toLocaleDateString('es-ES', { dateStyle: 'full' });
+        if (periodo === 'semana') return `Semana: ${inicio.toLocaleDateString('es-ES', optsDia)} - ${fin.toLocaleDateString('es-ES', optsDia)}`;
+        if (periodo === 'mes') return inicio.toLocaleDateString('es-ES', optsMes);
+        if (periodo === 'anio') return `Año ${inicio.getFullYear()}`;
+        return '';
+    };
 
     const getColor = (categoria: string) => {
         if (categoria === 'Aprobadas' || categoria === 'Completado') return '#7CCB64';
@@ -40,15 +81,11 @@ export default function CotizacionesScreen() {
 
     const fetchCotizaciones = async () => {
         try {
+            const { inicio, fin } = getRangoFechas(fechaBase || new Date(), periodo);
             let url = `http://10.0.0.1:8082/api/dashboard/movil/graficas?idUsuario=${ID_USUARIO}`;
 
-            if (fechaSeleccionada) {
-                const year = fechaSeleccionada.getFullYear();
-                const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
-                const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
-                const fechaFiltroStr = `${year}-${month}-${day}`;
-
-                url += `&fecha=${fechaFiltroStr}`;
+            if (fechaBase) {
+                url += `&fechaInicio=${formatDateISO(inicio)}&fechaFin=${formatDateISO(fin)}`;
             }
 
             const response = await fetch(url);
@@ -56,7 +93,6 @@ export default function CotizacionesScreen() {
             const data = await response.json();
 
             let suma = 0;
-
             const graficaPastel = (data.datosPastel || []).map((item: any) => {
                 suma += item.cantidad;
                 return {
@@ -74,15 +110,14 @@ export default function CotizacionesScreen() {
                 const razones = data.datosRadar.map((item: any) => ({
                     texto: item.etiqueta || "Sin motivo",
                     cantidad: item.valor || 0
-                }));
-                const razonesFiltradas = razones.filter((r: any) => r.cantidad > 0);
-                setRazonesData(razonesFiltradas);
+                })).filter((r: any) => r.cantidad > 0);
+                setRazonesData(razones);
             } else {
                 setRazonesData([]);
             }
 
         } catch (error) {
-            console.error("Error cargando datos:", error);
+            console.error(error);
             setPieData([]);
             setRazonesData([]);
         } finally {
@@ -94,7 +129,7 @@ export default function CotizacionesScreen() {
     useEffect(() => {
         setLoading(true);
         fetchCotizaciones();
-    }, [fechaSeleccionada]);
+    }, [fechaBase, periodo]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -102,16 +137,25 @@ export default function CotizacionesScreen() {
     };
 
     const onDateChange = (event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') {
-            setMostrarCalendario(false);
-            if (event.type === 'set' && selectedDate) setFechaSeleccionada(selectedDate);
-            return;
+        if (Platform.OS === 'android') setMostrarCalendario(false);
+        if (event.type === 'set' && selectedDate) {
+            setFechaBase(selectedDate);
         }
-        if (selectedDate) setFechaSeleccionada(selectedDate);
     };
 
-    const cerrarCalendario = () => setMostrarCalendario(false);
-    const limpiarFecha = () => setFechaSeleccionada(null);
+
+    const FilterTab = ({ label, value }: { label: string, value: Periodo }) => {
+        const isActive = periodo === value;
+        return (
+            <TouchableOpacity
+                style={[styles.tab, isActive && styles.tabActive]}
+                onPress={() => setPeriodo(value)}
+                activeOpacity={0.8}
+            >
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+            </TouchableOpacity>
+        );
+    };
 
     const chartConfig = {
         backgroundGradientFrom: "#ffffff",
@@ -123,185 +167,247 @@ export default function CotizacionesScreen() {
     };
 
     return (
-        <>
+        <View style={styles.mainContainer}>
             <Stack.Screen
                 options={{
                     headerShown: true,
-                    headerTitle: "Cotizaciones",
+                    headerTitle: "Estadísticas",
                     headerTitleAlign: 'center',
-                    headerTitleStyle: { fontFamily: "LexendTera-SemiBold", fontSize: 15 },
+                    headerTitleStyle: { fontFamily: "LexendTera-SemiBold", fontWeight: '700', fontSize: 15 },
                     headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
                     headerRight: () => (
                         <TouchableOpacity onPress={() => setMostrarCalendario(true)} style={{ marginRight: 20 }}>
-                            <FontAwesomeIcon icon={faCalendarDays} size={20} color={fechaSeleccionada ? "#3A88F6" : "#525252"} />
+                            <FontAwesomeIcon icon={faCalendarDays} size={20} color={"#525252"} />
                         </TouchableOpacity>
                     ),
                 }}
             />
 
-            <View style={styles.container}>
 
-                {/* BARRA DE FILTRO ACTIVO */}
-                {fechaSeleccionada && (
-                    <View style={styles.filtroBar}>
-                        <Text style={styles.filtroTexto}>
-                            Filtrando por: {fechaSeleccionada.toISOString().split('T')[0]}
-                        </Text>
-                        <TouchableOpacity onPress={limpiarFecha}>
-                            <Text style={styles.filtroReset}>Reestablecer</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+            <View style={styles.fixedHeader}>
+                <View style={styles.tabsBackground}>
+                    <FilterTab label="Día" value="dia" />
+                    <FilterTab label="Semana" value="semana" />
+                    <FilterTab label="Mes" value="mes" />
+                    <FilterTab label="Año" value="anio" />
+                </View>
 
-                <ScrollView
-                    contentContainerStyle={styles.scrollContainer}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                >
-
-                    {loading && !refreshing ? (
-                        <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 20 }} />
-                    ) : (
-                        <>
-                            {/* GRÁFICA DE PASTEL */}
-                            <View style={styles.cardContainer}>
-                                <View style={styles.cardHeader}>
-                                    <FontAwesomeIcon icon={faChartPie} size={16} color="#3A88F6" style={{ marginRight: 8 }} />
-                                    <Text style={styles.cardTitle}>Estado General</Text>
-                                </View>
-
-                                {pieData.length > 0 ? (
-                                    <View style={{ alignItems: 'center' }}>
-                                        <PieChart
-                                            data={pieData}
-                                            width={screenWidth - 60}
-                                            height={220}
-                                            chartConfig={chartConfig}
-                                            accessor={"population"}
-                                            backgroundColor={"transparent"}
-                                            paddingLeft={"15"}
-                                            center={[0, 0]}
-                                            absolute
-                                        />
-                                    </View>
-                                ) : (
-                                    <Text style={styles.noDataText}>No hay datos en este periodo.</Text>
-                                )}
-                            </View>
-
-                            {/* LISTA DE RAZONES */}
-                            <View style={styles.cardContainer}>
-                                <View style={styles.cardHeader}>
-                                    <FontAwesomeIcon icon={faListUl} size={16} color="#3A88F6" style={{ marginRight: 8 }} />
-                                    <Text style={styles.cardTitle}>Razones de Rechazo</Text>
-                                </View>
-
-                                {razonesData.length === 0 ? (
-                                    <Text style={styles.noDataText}>No hay cancelaciones registradas.</Text>
-                                ) : (
-                                    razonesData.map((item, index) => {
-                                        const maxVal = Math.max(...razonesData.map(r => r.cantidad));
-                                        const porcentaje = maxVal > 0 ? (item.cantidad / maxVal) * 100 : 0;
-
-                                        return (
-                                            <View key={index} style={styles.reasonRow}>
-                                                <View style={styles.reasonHeader}>
-                                                    <Text style={styles.reasonLabel}>{item.texto}</Text>
-                                                    <Text style={styles.reasonCount}>{item.cantidad}</Text>
-                                                </View>
-                                                <View style={styles.track}>
-                                                    <View style={[styles.bar, { width: `${porcentaje}%` }]} />
-                                                </View>
-                                            </View>
-                                        );
-                                    })
-                                )}
-                            </View>
-                        </>
-                    )}
-
-                </ScrollView>
-
-                {/* MODAL DE CALENDARIO */}
-                {mostrarCalendario && (
-                    Platform.OS === 'ios' ? (
-                        <Modal transparent={true} animationType="fade" visible={mostrarCalendario} onRequestClose={cerrarCalendario}>
-                            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={cerrarCalendario}>
-                                <View style={styles.iosDatePickerContainer} onStartShouldSetResponder={() => true}>
-                                    <View style={styles.iosToolbar}>
-                                        <TouchableOpacity onPress={cerrarCalendario}>
-                                            <Text style={styles.iosButtonText}>Listo</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="spinner" onChange={onDateChange} textColor="#000000" themeVariant="light" />
-                                </View>
-                            </TouchableOpacity>
-                        </Modal>
-                    ) : (
-                        <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="default" onChange={onDateChange} />
-                    )
-                )}
-
+                <View style={styles.dateInfoContainer}>
+                    <Text style={styles.dateInfoText}>
+                        {getTextoRango().charAt(0).toUpperCase() + getTextoRango().slice(1)}
+                    </Text>
+                    <TouchableOpacity onPress={() => setFechaBase(new Date())}>
+                        <Text style={styles.resetButton}>Hoy</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-        </>
+
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            >
+                {loading && !refreshing ? (
+                    <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 40 }} />
+                ) : (
+                    <>
+                        {/* CARD PASTEL */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeader}>
+                                <View style={styles.iconBg}>
+                                    <FontAwesomeIcon icon={faChartPie} size={14} color="#3A88F6" />
+                                </View>
+                                <Text style={styles.cardTitle}>Estado General</Text>
+                            </View>
+
+                            {pieData.length > 0 ? (
+                                <View style={{ alignItems: 'center' }}>
+                                    <PieChart
+                                        data={pieData}
+                                        width={screenWidth - 60}
+                                        height={220}
+                                        chartConfig={chartConfig}
+                                        accessor={"population"}
+                                        backgroundColor={"transparent"}
+                                        paddingLeft={"15"}
+                                        center={[0, 0]}
+                                        absolute
+                                    />
+                                    <Text style={styles.totalText}>Total: {totalMovimientos} Movimientos</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.noDataText}>No hay datos en este periodo.</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* CARD RAZONES */}
+                        <View style={styles.card}>
+                            <View style={styles.cardHeader}>
+                                <View style={[styles.iconBg, { backgroundColor: '#FFF0F0' }]}>
+                                    <FontAwesomeIcon icon={faListUl} size={14} color="#FE5F5F" />
+                                </View>
+                                <Text style={styles.cardTitle}>Motivos de Cancelación</Text>
+                            </View>
+
+                            {razonesData.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <Text style={styles.noDataText}>Sin cancelaciones registradas.</Text>
+                                </View>
+                            ) : (
+                                razonesData.map((item, index) => {
+                                    const maxVal = Math.max(...razonesData.map(r => r.cantidad));
+                                    const porcentaje = maxVal > 0 ? (item.cantidad / maxVal) * 100 : 0;
+
+                                    return (
+                                        <View key={index} style={styles.reasonRow}>
+                                            <View style={styles.reasonInfo}>
+                                                <Text style={styles.reasonText}>{item.texto}</Text>
+                                                <Text style={styles.reasonValue}>{item.cantidad}</Text>
+                                            </View>
+                                            <View style={styles.progressBarTrack}>
+                                                <View style={[styles.progressBarFill, { width: `${porcentaje}%` }]} />
+                                            </View>
+                                        </View>
+                                    );
+                                })
+                            )}
+                        </View>
+                    </>
+                )}
+            </ScrollView>
+
+            {/* MODAL */}
+            {mostrarCalendario && (
+                Platform.OS === 'ios' ? (
+                    <Modal transparent animationType="fade" visible={mostrarCalendario} onRequestClose={() => setMostrarCalendario(false)}>
+                        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setMostrarCalendario(false)}>
+                            <View style={styles.iosDateContainer}>
+                                <View style={styles.iosToolbar}>
+                                    <TouchableOpacity onPress={() => setMostrarCalendario(false)}>
+                                        <Text style={styles.iosDoneText}>Listo</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <DateTimePicker value={fechaBase} mode="date" display="spinner" onChange={onDateChange} textColor="#000000" maximumDate={new Date()} />
+                            </View>
+                        </TouchableOpacity>
+                    </Modal>
+                ) : (
+                    <DateTimePicker value={fechaBase} mode="date" display="default" onChange={onDateChange} maximumDate={new Date()} />
+                )
+            )}
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F5F5F5" },
-    scrollContainer: { padding: 20, paddingBottom: 50 },
+    mainContainer: { flex: 1, backgroundColor: "#F9FAFB" },
 
-    filtroBar: {
-        flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        alignItems: 'center',
-        backgroundColor: '#F0F8FF'
-    },
-    filtroTexto: { color: '#3A88F6', fontWeight: 'bold', marginRight: 10 },
-    filtroReset: { color: '#FF5555', fontWeight: 'bold' },
-
-    cardContainer: {
+    fixedHeader: {
         backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E5E7EB',
+        zIndex: 10,
+    },
+    tabsBackground: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
         borderRadius: 12,
-        marginBottom: 20,
-        padding: 15,
+        padding: 4,
+        height: 35,
+    },
+    tab: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    tabActive: {
+        backgroundColor: '#FFFFFF',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
         elevation: 2,
+    },
+    tabText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#6B7280',
+    },
+    tabTextActive: {
+        fontWeight: '700',
+        color: '#3A88F6',
+    },
+    dateInfoContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 10,
+        paddingHorizontal: 4
+    },
+    dateInfoText: {
+        fontSize: 13,
+        color: '#4B5563',
+        fontWeight: '600'
+    },
+    resetButton: {
+        fontSize: 13,
+        color: '#3A88F6',
+        fontWeight: '600'
+    },
+
+    scrollView: { flex: 1 },
+    scrollContent: { padding: 16, paddingBottom: 40 },
+
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 16,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 15,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-        paddingBottom: 10
+        marginBottom: 20
+    },
+    iconBg: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: '#EBF5FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12
     },
     cardTitle: {
         fontSize: 16,
-        fontWeight: "bold",
-        color: "#333",
-        fontFamily: "LexendTera-SemiBold",
+        fontWeight: "700",
+        color: "#111827"
     },
+    emptyState: { paddingVertical: 30, alignItems: 'center' },
+    noDataText: { color: '#9CA3AF', fontStyle: 'italic' },
+    totalText: { marginTop: 15, fontSize: 13, color: '#6B7280', fontWeight: '500' },
 
-    noDataText: {
-        color: '#999',
-        fontStyle: 'italic',
-        textAlign: 'center',
-        marginVertical: 20
-    },
-    reasonRow: { marginBottom: 15, width: '100%' },
-    reasonHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-    reasonLabel: { fontSize: 13, color: '#555', fontWeight: '600', maxWidth: '85%' },
-    reasonCount: { fontSize: 13, fontWeight: 'bold', color: '#FE5F5F' },
-    track: { height: 8, backgroundColor: '#E0E0E0', borderRadius: 4, width: '100%', overflow: 'hidden' },
-    bar: { height: '100%', backgroundColor: '#FE5F5F', borderRadius: 4 },
+    reasonRow: { marginBottom: 16 },
+    reasonInfo: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    reasonText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+    reasonValue: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
+    progressBarTrack: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, width: '100%', overflow: 'hidden' },
+    progressBarFill: { height: '100%', backgroundColor: '#EF4444', borderRadius: 4 },
 
-    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-    iosDatePickerContainer: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 20 },
-    iosToolbar: { flexDirection: 'row', justifyContent: 'flex-end', padding: 15, borderBottomWidth: 1, borderBottomColor: '#E0E0E0', backgroundColor: '#F8F8F8', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-    iosButtonText: { color: '#3A88F6', fontSize: 16, fontWeight: 'bold' },
+    modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' },
+    iosDateContainer: { backgroundColor: 'white', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 20 },
+    iosToolbar: { flexDirection: 'row', justifyContent: 'flex-end', padding: 15, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+    iosDoneText: { color: '#3A88F6', fontSize: 16, fontWeight: '600' }
 });
