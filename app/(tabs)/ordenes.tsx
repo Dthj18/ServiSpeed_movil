@@ -1,3 +1,4 @@
+import { apiFetch } from '@/services/apiClient';
 import { faBoxOpen, faCalendarDays, faClock, faFileInvoiceDollar, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -37,15 +38,13 @@ export default function OrdenesScreen() {
 
     const fetchOrdenes = async () => {
         try {
-            const response = await fetch('http://10.0.0.1:8082/api/ordenes/movil/tarjetas');
-            if (!response.ok) throw new Error("Error en el servidor");
-            const data = await response.json();
+            const data = await apiFetch('/api/ordenes/movil/tarjetas');
             if (Array.isArray(data)) {
                 setOrdenes(data);
             } else {
                 setOrdenes([]);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error: ", error);
             setOrdenes([]);
         } finally {
@@ -79,7 +78,7 @@ export default function OrdenesScreen() {
                 const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
                 const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
                 const fechaFiltroStr = `${year}-${month}-${day}`;
-                
+
                 if (orden.fechaIso !== fechaFiltroStr) return false;
             } else {
                 // FILTRO DE ACCESO RÁPIDO (MES ACTUAL)
@@ -92,33 +91,33 @@ export default function OrdenesScreen() {
                 const [anioOrden, mesOrden] = orden.fechaIso.split('-');
 
                 if (anioOrden !== anioActual || mesOrden !== mesActual) {
-                    return false; 
+                    return false;
                 }
             }
 
             // 2. FILTROS DE ESTATUS
             if (filtroActivo === "Todas") return true;
-            
+
             if (filtroActivo === "Completadas") {
                 return orden.claveEstatus === 'ORD_ENTREGADA';
             }
-            
+
             if (filtroActivo === "Canceladas") {
                 return orden.claveEstatus && (
-                    orden.claveEstatus.includes('CANCELADA') || 
-                    orden.claveEstatus.includes('RECHAZADO') || 
+                    orden.claveEstatus.includes('CANCELADA') ||
+                    orden.claveEstatus.includes('RECHAZADO') ||
                     orden.claveEstatus.includes('ATRASADA')
                 );
             }
-            
+
             if (filtroActivo === "En curso") {
-                return orden.claveEstatus !== 'ORD_ENTREGADA' && 
-                       (!orden.claveEstatus || (
-                           !orden.claveEstatus.includes('CANCELADA') && 
-                           !orden.claveEstatus.includes('RECHAZADO')
-                       ));
+                return orden.claveEstatus !== 'ORD_ENTREGADA' &&
+                    (!orden.claveEstatus || (
+                        !orden.claveEstatus.includes('CANCELADA') &&
+                        !orden.claveEstatus.includes('RECHAZADO')
+                    ));
             }
-            
+
             return true;
         });
     };
@@ -137,7 +136,7 @@ export default function OrdenesScreen() {
             setFechaSeleccionada(selectedDate);
         }
     };
-    
+
     const onWebDateChange = (event: any) => {
         const dateValue = event.target.value;
         if (dateValue) {
@@ -174,9 +173,9 @@ export default function OrdenesScreen() {
                     headerShown: true,
                     headerTitle: "Órdenes",
                     headerTitleAlign: 'center',
-                    headerTitleStyle: { 
-                        fontFamily: "LexendTera-SemiBold", 
-                        fontSize: 15 
+                    headerTitleStyle: {
+                        fontFamily: "LexendTera-SemiBold",
+                        fontSize: 15
                     },
                     headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
@@ -184,31 +183,31 @@ export default function OrdenesScreen() {
                         <View style={{ marginRight: 20 }}>
                             {Platform.OS === 'web' ? (
                                 <div style={{ position: 'relative' }}>
-                                    <FontAwesomeIcon 
-                                        icon={faCalendarDays} 
-                                        size={20} 
-                                        color={fechaSeleccionada ? "#3A88F6" : "#525252"} 
+                                    <FontAwesomeIcon
+                                        icon={faCalendarDays}
+                                        size={20}
+                                        color={fechaSeleccionada ? "#3A88F6" : "#525252"}
                                     />
-                                    <input 
-                                        type="date" 
+                                    <input
+                                        type="date"
                                         onChange={onWebDateChange}
-                                        style={{ 
-                                            position: 'absolute', 
-                                            top: 0, 
-                                            left: 0, 
-                                            width: '100%', 
-                                            height: '100%', 
-                                            opacity: 0, 
-                                            cursor: 'pointer' 
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            width: '100%',
+                                            height: '100%',
+                                            opacity: 0,
+                                            cursor: 'pointer'
                                         }}
                                     />
                                 </div>
                             ) : (
                                 <TouchableOpacity onPress={() => setMostrarCalendario(true)}>
-                                    <FontAwesomeIcon 
-                                        icon={faCalendarDays} 
-                                        size={20} 
-                                        color={fechaSeleccionada ? "#3A88F6" : "#525252"} 
+                                    <FontAwesomeIcon
+                                        icon={faCalendarDays}
+                                        size={20}
+                                        color={fechaSeleccionada ? "#3A88F6" : "#525252"}
                                     />
                                 </TouchableOpacity>
                             )}
@@ -232,11 +231,11 @@ export default function OrdenesScreen() {
                 <ScrollView
                     contentContainerStyle={styles.scrollContainer}
                     refreshControl={
-                        <RefreshControl 
-                            refreshing={refreshing} 
-                            onRefresh={onRefresh} 
-                            colors={["#3A88F6"]} 
-                            tintColor="#3A88F6" 
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={["#3A88F6"]}
+                            tintColor="#3A88F6"
                         />
                     }
                 >
@@ -246,7 +245,7 @@ export default function OrdenesScreen() {
                         {opcionesFiltro.map((opcion) => (
                             <TouchableOpacity key={opcion} onPress={() => setFiltroActivo(opcion)}>
                                 <Text style={[
-                                    styles.filtroTexto, 
+                                    styles.filtroTexto,
                                     filtroActivo === opcion && styles.filtroTextoActivo
                                 ]}>
                                     {opcion}
@@ -273,11 +272,11 @@ export default function OrdenesScreen() {
                                             <Text style={styles.cardNombre}>{item.nombreCliente}</Text>
                                             <View style={styles.cardFila}>
                                                 <View style={styles.cardFechaContainer}>
-                                                    <FontAwesomeIcon 
-                                                        icon={faCalendarDays} 
-                                                        size={14} 
-                                                        color={colorTema} 
-                                                        style={{ marginRight: 6 }} 
+                                                    <FontAwesomeIcon
+                                                        icon={faCalendarDays}
+                                                        size={14}
+                                                        color={colorTema}
+                                                        style={{ marginRight: 6 }}
                                                     />
                                                     <Text style={[styles.cardFechaTexto, { color: colorTema }]}>
                                                         {item.fecha || "Sin fecha"}
@@ -288,9 +287,9 @@ export default function OrdenesScreen() {
                                                     <Text style={styles.cardPillTexto}>{item.estatus}</Text>
                                                 </View>
                                             </View>
-                                            <Text 
-                                                style={styles.cardDescripcion} 
-                                                numberOfLines={1} 
+                                            <Text
+                                                style={styles.cardDescripcion}
+                                                numberOfLines={1}
                                                 ellipsizeMode="tail"
                                             >
                                                 {item.productoPrincipal}
@@ -314,23 +313,23 @@ export default function OrdenesScreen() {
                                             <Text style={styles.iosButtonText}>Listo</Text>
                                         </TouchableOpacity>
                                     </View>
-                                    <DateTimePicker 
-                                        value={fechaSeleccionada || new Date()} 
-                                        mode="date" 
-                                        display="spinner" 
-                                        onChange={onDateChange} 
-                                        textColor="#000000" 
-                                        themeVariant="light" 
+                                    <DateTimePicker
+                                        value={fechaSeleccionada || new Date()}
+                                        mode="date"
+                                        display="spinner"
+                                        onChange={onDateChange}
+                                        textColor="#000000"
+                                        themeVariant="light"
                                     />
                                 </View>
                             </TouchableOpacity>
                         </Modal>
                     ) : (
-                        <DateTimePicker 
-                            value={fechaSeleccionada || new Date()} 
-                            mode="date" 
-                            display="default" 
-                            onChange={onDateChange} 
+                        <DateTimePicker
+                            value={fechaSeleccionada || new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={onDateChange}
                         />
                     )
                 )}
@@ -346,11 +345,11 @@ export default function OrdenesScreen() {
                         <View style={styles.modalContent}>
                             <View style={styles.modalHeader}>
                                 <View style={[
-                                    styles.cardPill, 
-                                    { 
-                                        backgroundColor: getStatusColor(ordenSeleccionada?.claveEstatus || ""), 
-                                        width: 'auto', 
-                                        paddingHorizontal: 15 
+                                    styles.cardPill,
+                                    {
+                                        backgroundColor: getStatusColor(ordenSeleccionada?.claveEstatus || ""),
+                                        width: 'auto',
+                                        paddingHorizontal: 15
                                     }
                                 ]}>
                                     <Text style={styles.cardPillTexto}>{ordenSeleccionada?.estatus}</Text>
@@ -381,9 +380,9 @@ export default function OrdenesScreen() {
                                     <Text style={styles.detailLabel}>Productos ({listaProductos.length})</Text>
                                     {listaProductos.length > 0 ? (
                                         <View style={styles.listaProductosContainer}>
-                                            <ScrollView 
-                                                nestedScrollEnabled={true} 
-                                                showsVerticalScrollIndicator={true} 
+                                            <ScrollView
+                                                nestedScrollEnabled={true}
+                                                showsVerticalScrollIndicator={true}
                                                 contentContainerStyle={{ paddingRight: 5 }}
                                             >
                                                 {listaProductos.map((item: any, index: number) => (
@@ -441,15 +440,15 @@ export default function OrdenesScreen() {
 
                             <View style={styles.totalRow}>
                                 <View style={styles.totalFila}>
-                                    <FontAwesomeIcon 
-                                        icon={faFileInvoiceDollar} 
-                                        size={24} 
-                                        color={ordenSeleccionada?.claveEstatus?.includes('CANCELADA') ? "#FE5F5F" : "#7CCB64"} 
+                                    <FontAwesomeIcon
+                                        icon={faFileInvoiceDollar}
+                                        size={24}
+                                        color={ordenSeleccionada?.claveEstatus?.includes('CANCELADA') ? "#FE5F5F" : "#7CCB64"}
                                     />
                                     <Text style={styles.totalLabel}>Total de Venta</Text>
                                 </View>
                                 <Text style={[
-                                    styles.totalValue, 
+                                    styles.totalValue,
                                     ordenSeleccionada?.claveEstatus?.includes('CANCELADA') && styles.textoTachado
                                 ]}>
                                     ${ordenSeleccionada?.montoTotal?.toFixed(2)}
@@ -482,142 +481,142 @@ export default function OrdenesScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { 
-        flex: 1, 
-        backgroundColor: "#F5F5F5" 
+    container: {
+        flex: 1,
+        backgroundColor: "#F5F5F5"
     },
-    scrollContainer: { 
-        padding: 20 
+    scrollContainer: {
+        padding: 20
     },
-    titulo: { 
-        fontSize: 13, 
-        fontWeight: "bold", 
-        marginBottom: 15, 
-        color: "#333", 
-        fontFamily: "LexendTera-SemiBold" 
+    titulo: {
+        fontSize: 13,
+        fontWeight: "bold",
+        marginBottom: 15,
+        color: "#333",
+        fontFamily: "LexendTera-SemiBold"
     },
     filtroFechaContainer: {
-        flexDirection: 'row', 
-        paddingHorizontal: 20, 
-        paddingVertical: 10, 
-        alignItems: 'center', 
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        alignItems: 'center',
         backgroundColor: '#F0F8FF'
     },
     filtroFechaTexto: {
-        color: '#3A88F6', 
-        fontWeight: 'bold', 
+        color: '#3A88F6',
+        fontWeight: 'bold',
         marginRight: 10
     },
     filtroReestablecer: {
-        color: '#FF5555', 
+        color: '#FF5555',
         fontWeight: 'bold'
     },
     filtrosContainer: {
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        paddingHorizontal: 20, 
-        paddingVertical: 12, 
-        backgroundColor: '#FFFFFF', 
-        borderRadius: 25, 
-        borderWidth: 1, 
-        borderColor: '#E0E0E0', 
-        marginBottom: 20, 
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 25,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        marginBottom: 20,
         width: '100%',
     },
-    filtroTexto: { 
-        fontSize: 13, 
-        color: '#9E9E9E' 
+    filtroTexto: {
+        fontSize: 13,
+        color: '#9E9E9E'
     },
-    filtroTextoActivo: { 
-        color: '#3A88F6', 
-        fontWeight: 'bold' 
+    filtroTextoActivo: {
+        color: '#3A88F6',
+        fontWeight: 'bold'
     },
-    filtroSpacer: { 
-        width: 10 
+    filtroSpacer: {
+        width: 10
     },
-    cardContainer: { 
-        flexDirection: 'row', 
-        backgroundColor: '#FFFFFF', 
-        borderRadius: 12, 
-        marginBottom: 16, 
-        height: 110, 
-        overflow: 'hidden', 
-        elevation: 2, 
-        shadowColor: "#000", 
-        shadowOffset: { width: 0, height: 2 }, 
-        shadowOpacity: 0.1, 
-        shadowRadius: 4 
+    cardContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        marginBottom: 16,
+        height: 110,
+        overflow: 'hidden',
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4
     },
-    cardColorBar: { 
-        width: 8, 
-        height: '100%' 
+    cardColorBar: {
+        width: 8,
+        height: '100%'
     },
-    cardContent: { 
-        flex: 1, 
-        padding: 12, 
-        justifyContent: 'space-between' 
+    cardContent: {
+        flex: 1,
+        padding: 12,
+        justifyContent: 'space-between'
     },
-    cardNombre: { 
-        fontSize: 16, 
-        fontWeight: 'bold', 
-        color: '#000' 
+    cardNombre: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#000'
     },
-    cardFila: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'space-between' 
+    cardFila: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between'
     },
-    cardFechaContainer: { 
-        flexDirection: 'row', 
-        alignItems: 'center' 
+    cardFechaContainer: {
+        flexDirection: 'row',
+        alignItems: 'center'
     },
-    cardFechaTexto: { 
-        fontSize: 12, 
-        fontWeight: '500' 
+    cardFechaTexto: {
+        fontSize: 12,
+        fontWeight: '500'
     },
-    cardPill: { 
-        width: 100, 
-        paddingVertical: 4, 
-        borderRadius: 15, 
-        alignItems: 'center', 
-        justifyContent: 'center' 
+    cardPill: {
+        width: 100,
+        paddingVertical: 4,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center'
     },
-    cardPillTexto: { 
-        color: '#FFFFFF', 
-        fontSize: 11, 
-        fontWeight: 'bold', 
-        textAlign: 'center' 
+    cardPillTexto: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: 'bold',
+        textAlign: 'center'
     },
-    cardDescripcion: { 
-        fontSize: 12, 
-        color: '#666' 
+    cardDescripcion: {
+        fontSize: 12,
+        color: '#666'
     },
-    modalOverlay: { 
-        flex: 1, 
-        justifyContent: 'flex-end', 
-        backgroundColor: 'rgba(0,0,0,0.5)' 
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.5)'
     },
-    iosDatePickerContainer: { 
-        backgroundColor: 'white', 
-        borderTopLeftRadius: 20, 
-        borderTopRightRadius: 20, 
-        paddingBottom: 20 
+    iosDatePickerContainer: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: 20
     },
-    iosToolbar: { 
-        flexDirection: 'row', 
-        justifyContent: 'flex-end', 
-        padding: 15, 
-        borderBottomWidth: 1, 
-        borderBottomColor: '#E0E0E0', 
-        backgroundColor: '#F8F8F8', 
-        borderTopLeftRadius: 20, 
-        borderTopRightRadius: 20 
+    iosToolbar: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E0E0E0',
+        backgroundColor: '#F8F8F8',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20
     },
-    iosButtonText: { 
-        color: '#3A88F6', 
-        fontSize: 16, 
-        fontWeight: 'bold' 
+    iosButtonText: {
+        color: '#3A88F6',
+        fontSize: 16,
+        fontWeight: 'bold'
     },
     modalContent: {
         backgroundColor: 'white',
@@ -627,120 +626,120 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
         minHeight: 400,
     },
-    modalHeader: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: 10 
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10
     },
-    modalTitle: { 
-        fontSize: 22, 
-        fontWeight: 'bold', 
-        color: '#333', 
-        textAlign: 'center' 
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#333',
+        textAlign: 'center'
     },
-    divider: { 
-        height: 1, 
-        backgroundColor: '#EEE', 
-        marginVertical: 15 
+    divider: {
+        height: 1,
+        backgroundColor: '#EEE',
+        marginVertical: 15
     },
-    detailRow: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        marginBottom: 20 
+    detailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20
     },
-    detailLabel: { 
-        fontSize: 12, 
-        color: '#999', 
-        marginBottom: 2 
+    detailLabel: {
+        fontSize: 12,
+        color: '#999',
+        marginBottom: 2
     },
-    detailValue: { 
-        fontSize: 16, 
-        color: '#333', 
-        fontWeight: '500' 
+    detailValue: {
+        fontSize: 16,
+        color: '#333',
+        fontWeight: '500'
     },
-    iconContainer: { 
-        width: 40, 
-        height: 40, 
-        borderRadius: 20, 
-        backgroundColor: '#F0F8FF', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        marginRight: 15 
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F0F8FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15
     },
-    detailTextContainer: { 
-        flex: 1, 
-        justifyContent: 'center' 
+    detailTextContainer: {
+        flex: 1,
+        justifyContent: 'center'
     },
     listaProductosContainer: {
-        marginTop: 5, 
+        marginTop: 5,
         maxHeight: 120
     },
     productoFila: {
-        flexDirection: 'row', 
-        marginBottom: 8, 
+        flexDirection: 'row',
+        marginBottom: 8,
         alignItems: 'flex-start'
     },
     productoCantidad: {
-        width: 45, 
-        textAlign: 'right', 
-        fontWeight: '600', 
-        color: '#333', 
-        fontSize: 13, 
+        width: 45,
+        textAlign: 'right',
+        fontWeight: '600',
+        color: '#333',
+        fontSize: 13,
         marginTop: 2
     },
     productoEquis: {
-        width: 25, 
-        textAlign: 'center', 
-        color: '#999', 
-        fontSize: 13, 
+        width: 25,
+        textAlign: 'center',
+        color: '#999',
+        fontSize: 13,
         marginTop: 2
     },
     productoDescripcion: {
-        flex: 1, 
-        flexWrap: 'wrap', 
-        color: '#555', 
-        fontSize: 14, 
+        flex: 1,
+        flexWrap: 'wrap',
+        color: '#555',
+        fontSize: 14,
         lineHeight: 20
     },
-    totalRow: { 
-        flexDirection: 'row', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        backgroundColor: '#F9F9F9', 
-        padding: 15, 
-        borderRadius: 12, 
-        marginBottom: 20 
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F9F9F9',
+        padding: 15,
+        borderRadius: 12,
+        marginBottom: 20
     },
     totalFila: {
-        flexDirection: 'row', 
+        flexDirection: 'row',
         alignItems: 'center'
     },
-    totalLabel: { 
-        fontSize: 16, 
-        fontWeight: 'bold', 
-        color: '#555', 
-        marginLeft: 10 
+    totalLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#555',
+        marginLeft: 10
     },
-    totalValue: { 
-        fontSize: 22, 
-        fontWeight: 'bold', 
-        color: '#7CCB64' 
+    totalValue: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#7CCB64'
     },
     textoTachado: {
-        textDecorationLine: 'line-through', 
-        color: '#FE5F5F', 
+        textDecorationLine: 'line-through',
+        color: '#FE5F5F',
         textDecorationStyle: 'solid'
     },
-    closeButtonFull: { 
-        backgroundColor: '#F0F0F0', 
-        padding: 15, 
-        borderRadius: 12, 
-        alignItems: 'center' 
+    closeButtonFull: {
+        backgroundColor: '#F0F0F0',
+        padding: 15,
+        borderRadius: 12,
+        alignItems: 'center'
     },
-    closeButtonText: { 
-        color: '#555', 
-        fontWeight: 'bold', 
-        fontSize: 16 
+    closeButtonText: {
+        color: '#555',
+        fontWeight: 'bold',
+        fontSize: 16
     },
 });
