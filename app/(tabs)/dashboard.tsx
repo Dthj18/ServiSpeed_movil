@@ -1,10 +1,11 @@
+import { apiFetch } from '@/services/apiClient';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
 import { faBell } from '@fortawesome/free-regular-svg-icons';
 import { faArrowRight, faChartSimple, faClipboardList, faFileInvoiceDollar, faWallet } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from "react";
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -24,12 +25,13 @@ interface FinanzasDTO {
 export default function DashboardScreen() {
 
     const [filtroTiempo, setFiltroTiempo] = useState('Semana');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
     const [resumen, setResumen] = useState<DashboardResumen>({
         cotizacionesMes: 0,
         ordenesActivas: 0,
         pagosPendientes: 0
-
     });
 
     const [finanzas, setFinanzas] = useState<FinanzasDTO>({
@@ -39,35 +41,38 @@ export default function DashboardScreen() {
 
     const fetchDashboardData = async () => {
         try {
-            const response = await fetch('http://10.0.0.1:8082/api/dashboard/resumen');
-
-            if (response.ok) {
-                const data = await response.json();
-                setResumen(data);
-            } else {
-                console.error("Error al obtener datos del dashboard");
+            const data = await apiFetch('/api/dashboard/resumen');
+            setResumen(data);
+        } catch (error: any) {
+            console.error("Error al obtener datos del dashboard:", error);
+            if (error.status !== 401) {
+                setError(true);
             }
-        } catch (error) {
-            console.error("Error de red: ", error);
         }
     };
 
     const fetchFinanzas = async () => {
         try {
-            const response = await fetch(`http://10.0.0.1:8082/api/dashboard/finanzas?filtro=${filtroTiempo}`);
-            if (response.ok) {
-                const data = await response.json();
-                setFinanzas(data);
-            }
-        } catch (error) {
+            const data = await apiFetch(`/api/dashboard/finanzas?filtro=${filtroTiempo}`);
+            setFinanzas(data);
+        } catch (error: any) {
             console.error("Error finanzas:", error);
+            if (error.status !== 401) {
+                setError(true);
+            }
         }
     };
+
+    const cargarTodo = useCallback(() => {
+        setLoading(true);
+        setError(false);
+        Promise.all([fetchDashboardData(), fetchFinanzas()]).finally(() => setLoading(false));
+    }, [filtroTiempo]);
+
     useFocusEffect(
         useCallback(() => {
-            fetchDashboardData();
-            fetchFinanzas();
-        }, [filtroTiempo])
+            cargarTodo();
+        }, [cargarTodo])
     );
 
     const formatoMoneda = (cantidad: any) => {
@@ -80,7 +85,6 @@ export default function DashboardScreen() {
         }).format(numero);
     };
 
-
     const BotonFiltro = ({ texto }: { texto: string }) => (
         <TouchableOpacity
             style={[styles.periodButton, filtroTiempo === texto && styles.periodButtonActive]}
@@ -91,6 +95,27 @@ export default function DashboardScreen() {
             </Text>
         </TouchableOpacity>
     );
+
+    if (loading) {
+        return (
+            <SafeAreaView style={[styles.container, styles.centered]}>
+                <ActivityIndicator size="large" color="#5C7CFA" />
+            </SafeAreaView>
+        );
+    }
+
+    if (error) {
+        return (
+            <SafeAreaView style={[styles.container, styles.centered, { padding: 20 }]}>
+                <Text style={{ textAlign: 'center', color: '#6B7280', marginBottom: 15 }}>
+                    No se pudo cargar la información del dashboard.
+                </Text>
+                <TouchableOpacity style={styles.retryButton} onPress={cargarTodo}>
+                    <Text style={styles.retryButtonText}>Reintentar</Text>
+                </TouchableOpacity>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <>
@@ -177,7 +202,6 @@ export default function DashboardScreen() {
                         <View style={styles.financeHeaderRow}>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.sectionTitle}>Finanzas</Text>
-                                {/* TOTAL DINÁMICO */}
                                 <Text style={styles.totalAmount} numberOfLines={1} adjustsFontSizeToFit>
                                     {formatoMoneda(finanzas.montoPagado)}
                                 </Text>
@@ -191,7 +215,6 @@ export default function DashboardScreen() {
                         </View>
 
                         <View style={styles.chartWrapper}>
-                            {/* GRÁFICA DINÁMICA */}
                             {finanzas.datosGrafica.length > 0 ? (
                                 <BarChart
                                     key={JSON.stringify(finanzas.datosGrafica)}
@@ -216,7 +239,7 @@ export default function DashboardScreen() {
                                 />
                             ) : (
                                 <View style={{ height: 220, justifyContent: 'center', alignItems: 'center' }}>
-                                    <Text style={{ color: '#999' }}>Cargando datos...</Text>
+                                    <Text style={{ color: '#999' }}>Sin datos para este período</Text>
                                 </View>
                             )}
                         </View>
@@ -232,6 +255,20 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#FFFFFF",
+    },
+    centered: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    retryButton: {
+        backgroundColor: '#5C7CFA',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontWeight: '600',
     },
     scrollContainer: {
         paddingHorizontal: 20,
@@ -276,8 +313,6 @@ const styles = StyleSheet.create({
         opacity: 0.9,
         fontWeight: '500',
     },
-
-    // ESTILOS DE FINANZAS
     financeCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 20,
