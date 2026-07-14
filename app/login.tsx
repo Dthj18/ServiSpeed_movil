@@ -1,10 +1,27 @@
-import { faEnvelope, faKey } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiFetch } from '@/services/apiClient';
+import { saveSession } from '@/services/session';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
-import React, { useState } from "react";
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Image,
+    Keyboard,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableWithoutFeedback,
+    View
+} from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const GRADIENT_HEIGHT_EXPANDED = 440;
+const GRADIENT_HEIGHT_COLLAPSED = 180;
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -12,7 +29,37 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const gradientHeight = useRef(new Animated.Value(GRADIENT_HEIGHT_EXPANDED)).current;
+
+    useEffect(() => {
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+        const showSub = Keyboard.addListener(showEvent, (e) => {
+            Animated.timing(gradientHeight, {
+                toValue: GRADIENT_HEIGHT_COLLAPSED,
+                duration: Platform.OS === 'ios' ? e.duration ?? 250 : 250,
+                useNativeDriver: false,
+            }).start();
+        });
+
+        const hideSub = Keyboard.addListener(hideEvent, (e) => {
+            Animated.timing(gradientHeight, {
+                toValue: GRADIENT_HEIGHT_EXPANDED,
+                duration: Platform.OS === 'ios' ? e.duration ?? 250 : 250,
+                useNativeDriver: false,
+            }).start();
+        });
+
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
+
     const handleLogin = async () => {
+        Keyboard.dismiss();
+
         if (!email || !password) {
             Alert.alert('Error', 'Por favor ingresa correo y contraseña');
             return;
@@ -21,168 +68,146 @@ export default function LoginScreen() {
         setLoading(true);
 
         try {
-            const response = await fetch('http://10.0.0.1:8089/auth/login', {
+            const data = await apiFetch('/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: email,
-                    password: password,
-                }),
+                skipAuth: true,
+                body: { email, password },
             });
 
-            const data = await response.json();
-            if (response.ok) {
-                await AsyncStorage.setItem('userToken', data.token);
-                const usuarioData = {
-                    idUsuario: data.idUsuario,
-                    email: email,
-                    rol: data.rol
-                };
-                await AsyncStorage.setItem('userData', JSON.stringify(usuarioData));
-                router.replace('./(tabs)/dashboard');
-            } else {
-                Alert.alert('Error de autenticación', data.message || 'Correo o contraseña incorrectos');
-            }
+            await saveSession(data.token, {
+                idUsuario: data.idUsuario,
+                email: email,
+                rol: data.rol,
+                permisos: data.permisos,
+            });
 
-        } catch (error) {
-            console.error(error);
-            Alert.alert("Error", "Ocurrió un error en el inicio de sesión");
+            router.replace('/(tabs)/dashboard');
+        } catch (error: any) {
+            Alert.alert('Error de autenticación', error.body?.message || 'Correo o contraseña incorrectos');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <>
-            <Stack.Screen options={{ headerShown: false }} />
-            <View style={styles.container}>
-                {/* FONDO DINÁMICO: Un gradiente elegante y moderno que conecta con el color principal de la app */}
-                <LinearGradient
-                    colors={['#1E3A8A', '#3A88F6', '#60A5FA']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                />
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View style={styles.root}>
+                <Stack.Screen options={{ headerShown: false }} />
 
-                <KeyboardAvoidingView
-                    style={{ flex: 1 }}
-                    behavior={Platform.OS === "ios" ? "padding" : "height"}
-                >
-                    <ScrollView
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                        bounces={false}
-                        overScrollMode="never"
+                <Animated.View style={{ height: gradientHeight }}>
+                    <LinearGradient
+                        colors={['#1E3A8A', '#3A88F6', '#60A5FA']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.gradient}
                     >
-                        {/* SECCIÓN DEL LOGO */}
-                        <View style={styles.topSection}>
-                            <Image
-                                source={require('../assets/images/logo.png')}
-                                resizeMode={"contain"}
-                                style={styles.logo}
+                        <SafeAreaView style={styles.safeArea} edges={['top']}>
+                            <View style={styles.logoWrap}>
+                                <Image
+                                    source={require('../assets/images/logo.png')}
+                                    resizeMode="contain"
+                                    style={styles.logo}
+                                />
+                            </View>
+                        </SafeAreaView>
+                    </LinearGradient>
+                </Animated.View>
+
+                <View style={styles.card}>
+                    <View
+                        style={styles.cardContent}>
+
+                        <View style={styles.dragIndicator} />
+
+                        <Text style={styles.title}>Bienvenido</Text>
+                        <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="mail" size={20} color="#3A88F6" style={styles.inputIcon} />
+                            <TextInput
+                                placeholder="Correo Electrónico"
+                                value={email}
+                                onChangeText={setEmail}
+                                style={styles.input}
+                                placeholderTextColor="#9CA3AF"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                returnKeyType="next"
                             />
                         </View>
 
-                        {/* SECCIÓN DEL FORMULARIO */}
-                        <View style={styles.bottomSection}>
-                            <View style={styles.dragIndicator} />
-                            
-                            <Text style={styles.title}>Bienvenido</Text>
-                            <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
-
-                            <View style={styles.inputContainer}>
-                                <FontAwesomeIcon
-                                    icon={faEnvelope}
-                                    style={styles.inputIcon}
-                                    size={18}
-                                />
-                                <TextInput
-                                    placeholder={"Correo Electrónico"}
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    style={styles.input}
-                                    placeholderTextColor="#9CA3AF"
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <FontAwesomeIcon
-                                    icon={faKey}
-                                    style={styles.inputIcon}
-                                    size={18}
-                                />
-                                <TextInput
-                                    placeholder={"Contraseña"}
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    style={styles.input}
-                                    placeholderTextColor="#9CA3AF"
-                                    secureTextEntry={true}
-                                />
-                            </View>
-
-                            <TouchableOpacity 
-                                onPress={handleLogin} 
-                                style={styles.loginButton}
-                                activeOpacity={0.8}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="#FFFFFF" />
-                                ) : (
-                                    <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
-                                )}
-                            </TouchableOpacity>
+                        <View style={styles.inputContainer}>
+                            <Ionicons name="key" size={20} color="#3A88F6" style={styles.inputIcon} />
+                            <TextInput
+                                placeholder="Contraseña"
+                                value={password}
+                                onChangeText={setPassword}
+                                style={styles.input}
+                                placeholderTextColor="#9CA3AF"
+                                secureTextEntry
+                                returnKeyType="done"
+                                onSubmitEditing={handleLogin}
+                            />
                         </View>
-                    </ScrollView>
-                </KeyboardAvoidingView>
+
+                        <Pressable
+                            onPress={handleLogin}
+                            disabled={loading}
+                            hitSlop={8}
+                            style={({ pressed }) => [
+                                styles.loginButton,
+                                pressed && styles.loginButtonPressed,
+                            ]}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#FFFFFF" />
+                            ) : (
+                                <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                            )}
+                        </Pressable>
+                    </View>
+                </View>
             </View>
-        </>
+        </TouchableWithoutFeedback>
     );
 }
-
 const styles = StyleSheet.create({
-    container: {
+    root: {
+        flex: 1,
+        backgroundColor: '#1E3A8A',
+    },
+    gradient: {
+        flex: 1
+    },
+    safeArea: {
         flex: 1,
     },
-    scrollContent: {
-        flexGrow: 1,
-        justifyContent: 'space-between',
-    },
-    topSection: {
+    logoWrap: {
         flex: 1,
-        minHeight: 280,
         justifyContent: 'center',
         alignItems: 'center',
     },
     logo: {
-        width: 200,
-        height: 200,
-        // Opcional: Agregarle un poco de sombra al logo para que resalte sobre el gradiente
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 5,
+        width: 170,
+        height: 170,
     },
-    bottomSection: {
-        backgroundColor: "#FFFFFF", // Blanco limpio como en las otras pantallas
+    card: {
+        backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 40,
         borderTopRightRadius: 40,
-        paddingHorizontal: 30,
-        paddingTop: 20,
-        paddingBottom: 50,
-        width: '100%',
-        // Sombra superior para dar profundidad
+        marginTop: -30,
+        minHeight: 500,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: -5 },
         shadowOpacity: 0.1,
         shadowRadius: 10,
         elevation: 10,
+    },
+    cardContent: {
+        paddingHorizontal: 30,
+        paddingTop: 25,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 30,
+        flexGrow: 1,
     },
     dragIndicator: {
         width: 50,
@@ -193,9 +218,9 @@ const styles = StyleSheet.create({
         marginBottom: 25,
     },
     title: {
-        fontFamily: "LexendTera-SemiBold", // Integración de tu fuente moderna
-        color: "#1F2937", // Gris oscuro elegante
+        color: "#1F2937",
         fontSize: 28,
+        fontWeight: 'bold',
         marginBottom: 5,
     },
     subtitle: {
@@ -205,43 +230,46 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     inputContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#F9FAFB", // Gris súper claro
-        borderRadius: 14, // Radio de 14 igual a las tarjetas de órdenes
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: "#F9FAFB",
+        borderRadius: 14,
         marginBottom: 16,
         height: 55,
         paddingHorizontal: 16,
         borderWidth: 1,
-        borderColor: "#E5E7EB", // Borde sutil
+        borderColor: "#E5E7EB",
     },
     input: {
         color: "#1F2937",
-        fontSize: 14,
+        fontSize: 15,
         flex: 1,
-        marginLeft: 12,
+        marginLeft: 10,
         height: '100%',
         fontWeight: '500',
     },
     inputIcon: {
-        color: "#3A88F6", // Íconos en el azul principal de tu app
+        marginRight: 4,
     },
     loginButton: {
-        backgroundColor: '#3A88F6', // Color sólido primario igual al de "Ver Historial"
+        backgroundColor: '#3A88F6',
         borderRadius: 14,
         height: 55,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 20,
+        marginTop: 15,
         shadowColor: "#3A88F6",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,
         elevation: 4,
     },
+    loginButtonPressed: {
+        opacity: 0.8,
+    },
     loginButtonText: {
         color: "#FFFFFF",
-        fontFamily: "LexendTera-SemiBold",
-        fontSize: 15,
+        fontSize: 16,
+        fontWeight: 'bold',
     },
 });
