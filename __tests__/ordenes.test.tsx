@@ -1,8 +1,8 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import React from 'react';
-import OrdenesScreen from '../app/(tabs)/ordenes'; // ⚠️ Verifica que la ruta sea correcta
+import OrdenesScreen from '../app/(tabs)/ordenes';
 
-// --- 1. MOCKS GLOBALES (Para que no fallen las librerías externas) ---
+// --- 1. MOCKS GLOBALES
 
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
@@ -22,6 +22,16 @@ jest.mock('@react-native-community/datetimepicker', () => {
     }),
   };
 });
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(() => Promise.resolve('fake-token')),
+  setItemAsync: jest.fn(() => Promise.resolve()),
+  deleteItemAsync: jest.fn(() => Promise.resolve()),
+}));
 
 // Mock de Fetch Global
 global.fetch = jest.fn();
