@@ -1,3 +1,5 @@
+import { apiFetch } from '@/services/apiClient';
+import { getUsuario } from '@/services/session';
 import { faCalendarDays, faChartPie, faListUl } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,7 +24,6 @@ const screenWidth = Dimensions.get("window").width;
 type Periodo = 'dia' | 'semana' | 'mes' | 'anio';
 
 export default function CotizacionesScreen() {
-    const ID_USUARIO = 2;
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -81,16 +82,24 @@ export default function CotizacionesScreen() {
 
     const fetchCotizaciones = async () => {
         try {
-            const { inicio, fin } = getRangoFechas(fechaBase || new Date(), periodo);
-            let url = `http://10.0.0.1:8082/api/dashboard/movil/graficas?idUsuario=${ID_USUARIO}`;
+            const usuario = await getUsuario();
+            const idUsuario = usuario?.idUsuario;
 
-            if (fechaBase) {
-                url += `&fechaInicio=${formatDateISO(inicio)}&fechaFin=${formatDateISO(fin)}`;
+            if (!idUsuario) {
+                console.log("No hay usuario en sesión");
+                setPieData([]);
+                setRazonesData([]);
+                return;
             }
 
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`Error API: ${response.status}`);
-            const data = await response.json();
+            const { inicio, fin } = getRangoFechas(fechaBase || new Date(), periodo);
+            let endpoint = `/api/dashboard/movil/graficas?idUsuario=${idUsuario}`;
+
+            if (fechaBase) {
+                endpoint += `&fechaInicio=${formatDateISO(inicio)}&fechaFin=${formatDateISO(fin)}`;
+            }
+
+            const data = await apiFetch(endpoint);
 
             let suma = 0;
             const graficaPastel = (data.datosPastel || []).map((item: any) => {
