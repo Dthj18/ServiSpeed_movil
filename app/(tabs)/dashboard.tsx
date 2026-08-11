@@ -4,12 +4,15 @@ import { faBell } from '@fortawesome/free-regular-svg-icons';
 import { faArrowRight, faChartSimple, faClipboardList, faFileInvoiceDollar, faWallet } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { router, Stack, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const screenWidth = Dimensions.get("window").width;
+
+const COLOR_INGRESOS = '#20C997';
+const COLOR_EGRESOS = '#FF6B6B';
 
 interface DashboardResumen {
     cotizacionesMes: number;
@@ -17,9 +20,15 @@ interface DashboardResumen {
     pagosPendientes: number;
 }
 
+interface PuntoGrafica {
+    label: string;
+    ingresos: number;
+    egresos: number;
+}
+
 interface FinanzasDTO {
-    montoPagado: number;
-    datosGrafica: any[];
+    balanceTotal: number;
+    datosGrafica: PuntoGrafica[];
 }
 
 export default function DashboardScreen() {
@@ -35,7 +44,7 @@ export default function DashboardScreen() {
     });
 
     const [finanzas, setFinanzas] = useState<FinanzasDTO>({
-        montoPagado: 0,
+        balanceTotal: 0,
         datosGrafica: []
     });
 
@@ -53,7 +62,7 @@ export default function DashboardScreen() {
 
     const fetchFinanzas = async () => {
         try {
-            const data = await apiFetch(`/api/dashboard/finanzas?filtro=${filtroTiempo}`);
+            const data = await apiFetch(`/api/dashboard/finanzas/grafica-app?filtro=${filtroTiempo.toLowerCase()}`);
             setFinanzas(data);
         } catch (error: any) {
             console.error("Error finanzas:", error);
@@ -84,6 +93,38 @@ export default function DashboardScreen() {
             currency: 'MXN'
         }).format(numero);
     };
+
+    const chartData = useMemo(() => {
+        const result: any[] = [];
+        finanzas.datosGrafica.forEach((item) => {
+            result.push({
+                value: item.ingresos,
+                label: item.label,
+                spacing: 2,
+                labelWidth: 30,
+                labelTextStyle: { color: '#6B7280', fontSize: 11, fontWeight: '500', marginTop: 4 },
+                frontColor: COLOR_INGRESOS,
+                tipo: 'Ingresos'
+            });
+            result.push({
+                value: item.egresos,
+                spacing: finanzas.datosGrafica.length <= 5 ? 35 : 20,
+                frontColor: COLOR_EGRESOS,
+                tipo: 'Egresos'
+            });
+        });
+        return result;
+    }, [finanzas.datosGrafica]);
+
+    const topeGrafica = useMemo(() => {
+        let max = 0;
+        finanzas.datosGrafica.forEach(item => {
+            if (item.ingresos > max) max = item.ingresos;
+            if (item.egresos > max) max = item.egresos;
+        });
+
+        return max === 0 ? 100 : max * 1.3;
+    }, [finanzas.datosGrafica]);
 
     const BotonFiltro = ({ texto }: { texto: string }) => (
         <TouchableOpacity
@@ -129,9 +170,7 @@ export default function DashboardScreen() {
                         fontSize: 15,
                         color: '#000000',
                     },
-                    headerStyle: {
-                        backgroundColor: '#FFFFFF',
-                    },
+                    headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
                     headerLeft: () => null,
                     headerRight: () => (
@@ -146,10 +185,7 @@ export default function DashboardScreen() {
                 <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
 
                     <View style={styles.cardsGrid}>
-                        <TouchableOpacity
-                            style={[styles.card, { backgroundColor: '#5C7CFA' }]}
-                            onPress={() => router.push('/(tabs)/cotizaciones')}
-                        >
+                        <TouchableOpacity style={[styles.card, { backgroundColor: '#5C7CFA' }]} onPress={() => router.push('/(tabs)/cotizaciones')}>
                             <View style={styles.cardHeader}>
                                 <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
                                     <FontAwesomeIcon icon={faFileInvoiceDollar as IconProp} size={18} color="#FFFFFF" />
@@ -159,10 +195,7 @@ export default function DashboardScreen() {
                             <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Total cotizaciones</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.card, { backgroundColor: '#4dabf7' }]}
-                            onPress={() => router.push('/(tabs)/ordenes')}
-                        >
+                        <TouchableOpacity style={[styles.card, { backgroundColor: '#4dabf7' }]} onPress={() => router.push('/(tabs)/ordenes')}>
                             <View style={styles.cardHeader}>
                                 <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
                                     <FontAwesomeIcon icon={faClipboardList as IconProp} size={18} color="#FFFFFF" />
@@ -182,10 +215,7 @@ export default function DashboardScreen() {
                             <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Pagos pendientes</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.card, { backgroundColor: '#20C997' }]}
-                            onPress={() => router.push('/(tabs)/estadisticas')}
-                        >
+                        <TouchableOpacity style={[styles.card, { backgroundColor: '#20C997' }]} onPress={() => router.push('/(tabs)/estadisticas')}>
                             <View style={styles.cardHeader}>
                                 <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
                                     <FontAwesomeIcon icon={faChartSimple as IconProp} size={18} color="#FFFFFF" />
@@ -203,7 +233,7 @@ export default function DashboardScreen() {
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.sectionTitle}>Finanzas</Text>
                                 <Text style={styles.totalAmount} numberOfLines={1} adjustsFontSizeToFit>
-                                    {formatoMoneda(finanzas.montoPagado)}
+                                    {formatoMoneda(finanzas.balanceTotal)}
                                 </Text>
                             </View>
 
@@ -215,27 +245,50 @@ export default function DashboardScreen() {
                         </View>
 
                         <View style={styles.chartWrapper}>
-                            {finanzas.datosGrafica.length > 0 ? (
+                            {chartData.length > 0 ? (
                                 <BarChart
-                                    key={JSON.stringify(finanzas.datosGrafica)}
-                                    data={finanzas.datosGrafica}
-                                    rulesLength={screenWidth - 120}
-                                    barWidth={22}
+                                    key={JSON.stringify(chartData)}
+                                    data={chartData}
+                                    maxValue={topeGrafica}
+                                    rulesLength={screenWidth - 80}
+                                    barWidth={14}
                                     barBorderTopLeftRadius={4}
                                     barBorderTopRightRadius={4}
-                                    frontColor="#5C7CFA"
-                                    spacing={finanzas.datosGrafica.length <= 4 ? 50 : 25}
-                                    initialSpacing={20}
+                                    initialSpacing={10}
                                     yAxisThickness={0}
                                     xAxisThickness={0}
                                     yAxisTextStyle={{ color: '#9CA3AF', fontSize: 11 }}
-                                    xAxisLabelTextStyle={{ color: '#6B7280', fontSize: 11, fontWeight: '500', marginTop: 4 }}
                                     hideRules={false}
                                     rulesType="dashed"
                                     rulesColor="#E5E7EB"
                                     height={230}
                                     isAnimated
                                     animationDuration={400}
+
+                                    renderTooltip={(item: any) => {
+                                        return (
+                                            <View style={{
+                                                backgroundColor: '#1F2937',
+                                                paddingHorizontal: 12,
+                                                paddingVertical: 8,
+                                                borderRadius: 8,
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                marginBottom: 5,
+                                                marginLeft: -10,
+                                            }}>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.frontColor, marginRight: 6 }} />
+                                                    <Text style={{ color: '#D1D5DB', fontSize: 10, fontWeight: '600' }}>
+                                                        {item.tipo}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>
+                                                    {formatoMoneda(item.value)}
+                                                </Text>
+                                            </View>
+                                        );
+                                    }}
                                 />
                             ) : (
                                 <View style={{ height: 220, justifyContent: 'center', alignItems: 'center' }}>
@@ -250,7 +303,6 @@ export default function DashboardScreen() {
         </>
     );
 }
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
