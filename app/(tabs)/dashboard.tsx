@@ -100,9 +100,12 @@ export default function DashboardScreen() {
             result.push({
                 value: item.ingresos,
                 label: item.label,
-                spacing: 2,
-                labelWidth: 30,
-                labelTextStyle: { color: '#6B7280', fontSize: 11, fontWeight: '500', marginTop: 4 },
+                spacing: .5,
+                labelWidth: 45,
+                labelTextStyle: {
+                    color: '#6B7280', fontSize: 11, fontWeight: '500', marginTop: 4, textAlign: 'center',
+                    marginLeft: -8
+                },
                 frontColor: COLOR_INGRESOS,
                 tipo: 'Ingresos'
             });

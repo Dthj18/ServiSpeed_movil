@@ -71,7 +71,6 @@ export default function OrdenesScreen() {
 
     const getOrdenesFiltradas = () => {
         return ordenes.filter((orden) => {
-            // 1. FILTRO DE FECHA (CALENDARIO O MES ACTUAL)
             if (fechaSeleccionada) {
                 if (!orden.fechaIso) return false;
                 const year = fechaSeleccionada.getFullYear();
@@ -81,7 +80,6 @@ export default function OrdenesScreen() {
 
                 if (orden.fechaIso !== fechaFiltroStr) return false;
             } else {
-                // FILTRO DE ACCESO RÁPIDO (MES ACTUAL)
                 const hoy = new Date();
                 const mesActual = (hoy.getMonth() + 1).toString().padStart(2, '0');
                 const anioActual = hoy.getFullYear().toString();
@@ -95,7 +93,6 @@ export default function OrdenesScreen() {
                 }
             }
 
-            // 2. FILTROS DE ESTATUS
             if (filtroActivo === "Todas") return true;
 
             if (filtroActivo === "Completadas") {
