@@ -3,17 +3,23 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import OrdenesScreen from '../app/(tabs)/ordenes';
 
-// --- 1. MOCKS GLOBALES
+// --- 1. MOCKS GLOBALES ---
 
+// A. Mocks de Navegación
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useRouter: () => ({ push: jest.fn() }),
 }));
 
+// B. Mocks de Iconos (Para evitar el error rojo de act(...) en consola)
+jest.mock('@expo/vector-icons', () => {
+  return new Proxy({}, { get: () => 'Icon' });
+});
 jest.mock('@fortawesome/react-native-fontawesome', () => ({
   FontAwesomeIcon: '',
 }));
 
+// C. Mocks de Componentes Nativos y Almacenamiento
 jest.mock('@react-native-community/datetimepicker', () => {
   const React = require('react');
   return {
@@ -34,21 +40,21 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock de Fetch Global
-global.fetch = jest.fn();
+// D. MOCK CRUCIAL DE APIFETCH (Para evitar el TypeError de mockResolvedValue)
+jest.mock('@/services/apiClient', () => ({
+  apiFetch: jest.fn(),
+}));
 
 // --- 2. PREPARACIÓN DE FECHAS DINÁMICAS ---
-// Esto es vital: Calculamos la fecha de HOY para que el filtro de "Mes Actual"
-// de tu pantalla no oculte los datos de prueba.
 const today = new Date();
 const year = today.getFullYear();
 const month = (today.getMonth() + 1).toString().padStart(2, '0');
 const day = today.getDate().toString().padStart(2, '0');
-const fechaHoyIso = `${year}-${month}-${day}`; // Ej: "2026-01-12"
+const fechaHoyIso = `${year}-${month}-${day}`; // Ej: "2026-08-12"
 
 describe('OrdenesScreen', () => {
 
-  // Datos de prueba con FECHA DE HOY
+  // Datos de prueba con FECHA DE HOY simulando la paginación del backend
   const mockOrdenes = [
     {
       idOrden: 101,
@@ -57,12 +63,12 @@ describe('OrdenesScreen', () => {
       productoPrincipal: "Lona 3x3",
       estatus: "Entregada",
       claveEstatus: "ORD_ENTREGADA",
-      fechaIso: fechaHoyIso, // <--- ¡AQUÍ ESTÁ EL TRUCO!
+      fechaIso: fechaHoyIso,
       nombreEncargado: "Juan",
       montoTotal: 500.00,
       fechaEntrega: fechaHoyIso,
       descripcionEstatus: "Entregado al cliente",
-      detallesJson: JSON.stringify([{ cantidad: 1, descripcion: "Lona" }]) // JSON válido
+      detallesJson: JSON.stringify([{ cantidad: 1, descripcion: "Lona" }])
     },
     {
       idOrden: 102,
@@ -70,8 +76,8 @@ describe('OrdenesScreen', () => {
       fecha: "Hoy",
       productoPrincipal: "Tarjetas",
       estatus: "Cancelada",
-      claveEstatus: "ORD_CANCELADA", // Asegúrate que coincida con tu filtro
-      fechaIso: fechaHoyIso, // <--- ¡AQUÍ TAMBIÉN!
+      claveEstatus: "ORD_CANCELADA",
+      fechaIso: fechaHoyIso,
       nombreEncargado: "Pedro",
       montoTotal: 150.00,
       fechaEntrega: fechaHoyIso,
@@ -81,21 +87,22 @@ describe('OrdenesScreen', () => {
   ];
 
   beforeEach(() => {
-    (global.fetch as jest.Mock).mockClear();
+    // Limpiamos el mock de apiFetch antes de cada test para no cruzar datos
+    (apiFetch as jest.Mock).mockClear();
     // Silenciar errores de consola molestos durante el test
     jest.spyOn(console, 'error').mockImplementation(() => { });
   });
 
   it('Renderiza la lista de órdenes correctamente (Happy Path)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockOrdenes,
+    // Usamos apiFetch devolviendo el objeto con 'content' (Paginación)
+    (apiFetch as jest.Mock).mockResolvedValueOnce({
+      content: mockOrdenes,
+      last: true
     });
 
     const { getByText } = render(<OrdenesScreen />);
 
     await waitFor(() => {
-      // Ahora sí los va a encontrar porque la fecha coincide con el mes actual
       expect(getByText('Cliente Feliz')).toBeTruthy();
       expect(getByText('Cliente Cancelado')).toBeTruthy();
       expect(getByText('Lona 3x3')).toBeTruthy();
@@ -103,38 +110,38 @@ describe('OrdenesScreen', () => {
   });
 
   it('Filtra las órdenes al presionar los botones de filtro (Chips)', async () => {
-
-    // 1. Configura el mock para que TODAS las peticiones devuelvan los datos paginados
+    // Usamos mockResolvedValue (sin Once) para que sobreviva al cambio de filtro
     (apiFetch as jest.Mock).mockResolvedValue({
       content: [
         {
-          idOrden: 1,
+          idOrden: 101,
           nombreCliente: 'Cliente Feliz',
           claveEstatus: 'ORD_ENTREGADA',
           estatus: 'Completado',
-          fechaIso: '2026-08-12' // Asegúrate de incluir los campos obligatorios
+          fechaIso: fechaHoyIso,
+          productoPrincipal: "Lona",
+          montoTotal: 500.00,
+          detallesJson: JSON.stringify([{ cantidad: 1, descripcion: "Lona" }])
         }
       ],
       last: true
     });
 
-    // 2. Renderiza tu componente
     const { getByText, queryByText } = render(<OrdenesScreen />);
 
-    // 3. Simula el click en el filtro
+    // Simula el click en el filtro
     fireEvent.press(getByText('Completadas'));
 
-    // 4. Espera a que el componente se actualice con la nueva petición
     await waitFor(() => {
       expect(getByText('Cliente Feliz')).toBeTruthy();
-      expect(queryByText('Cliente Cancelado')).toBeNull();
+      expect(queryByText('Cliente Cancelado')).toBeNull(); // Verificamos que desapareció
     });
   });
 
   it('Abre el Modal de detalle al presionar una tarjeta', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockOrdenes,
+    (apiFetch as jest.Mock).mockResolvedValueOnce({
+      content: mockOrdenes,
+      last: true
     });
 
     const { getByText } = render(<OrdenesScreen />);
@@ -144,19 +151,18 @@ describe('OrdenesScreen', () => {
     // Presionamos la tarjeta
     fireEvent.press(getByText('Cliente Feliz'));
 
-    // Verificamos algo que solo sale en el modal (según tu código)
-    // Asegúrate que tu modal muestre "Total de Venta" o el ID
+    // Verificamos que el modal se abrió buscando una etiqueta única de su interior
     await waitFor(() => {
       expect(getByText('Total de Venta')).toBeTruthy();
     });
   });
 
   it('Maneja correctamente una respuesta de error del servidor', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Error de red"));
+    (apiFetch as jest.Mock).mockRejectedValueOnce(new Error("Error de red"));
 
     const { getByText } = render(<OrdenesScreen />);
 
-    // Verificamos que la pantalla renderice al menos el título y no explote
+    // Verificamos que la pantalla renderice la cabecera sin crashear
     await waitFor(() => {
       expect(getByText('Filtro de Órdenes')).toBeTruthy();
     });
