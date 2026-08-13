@@ -1,10 +1,10 @@
 import { apiFetch } from '@/services/apiClient';
-import { faBoxOpen, faCalendarDays, faClock, faFileInvoiceDollar, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
+import { faBoxOpen, faCalendarDays, faClock, faFileInvoiceDollar, faSearch, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 interface OrdenCard {
     idOrden: number;
@@ -28,39 +28,147 @@ export default function OrdenesScreen() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    const [page, setPage] = useState(0);
+    const [isLastPage, setIsLastPage] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     const [filtroActivo, setFiltroActivo] = useState("Todas");
     const opcionesFiltro = ["Todas", "En curso", "Completadas", "Canceladas"];
     const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
     const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
+    const [busqueda, setBusqueda] = useState('');
+    const [debouncedBusqueda, setDebouncedBusqueda] = useState('');
+
     const [modalDetalleVisible, setModalDetalleVisible] = useState(false);
     const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCard | null>(null);
 
-    const fetchOrdenes = async () => {
+    const formatearFechaEspanol = (fechaIso: string) => {
+        if (!fechaIso) return "Sin fecha";
+
+        const meses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+
+        const partes = fechaIso.split('-');
+        if (partes.length !== 3) return fechaIso;
+
+        const mesIndex = parseInt(partes[1], 10) - 1;
+        const dia = parseInt(partes[2], 10);
+
+        return `${meses[mesIndex]} ${dia}`;
+    };
+
+    const formatearFechaEntregaEspanol = (fechaString?: string) => {
+        if (!fechaString || fechaString === 'Por definir') return 'Por definir';
+
+        const mesesDiccionario: { [key: string]: string } = {
+            'Jan': 'Enero', 'Feb': 'Febrero', 'Mar': 'Marzo', 'Apr': 'Abril',
+            'May': 'Mayo', 'Jun': 'Junio', 'Jul': 'Julio', 'Aug': 'Agosto',
+            'Sep': 'Septiembre', 'Oct': 'Octubre', 'Nov': 'Noviembre', 'Dec': 'Diciembre'
+        };
+
+        const partes = fechaString.trim().split(/\s+/);
+
+        if (partes.length === 3) {
+            const dia = parseInt(partes[0], 10);
+            const mesIngles = partes[1];
+            const anio = partes[2];
+
+            const mesEspanol = mesesDiccionario[mesIngles] || mesIngles;
+
+            return `${dia} de ${mesEspanol} de ${anio}`;
+        }
+
+        return fechaString;
+    };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedBusqueda(busqueda);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [busqueda]);
+
+    const fetchOrdenes = async (pageNumber = 0) => {
+        if (pageNumber > 0 && (loadingMore || loading || isLastPage)) return;
+
+        if (pageNumber === 0) {
+            setLoading(true);
+            setIsLastPage(false);
+            setPage(0);
+        } else {
+            setLoadingMore(true);
+        }
+
         try {
-            const data = await apiFetch('/api/ordenes/movil/tarjetas');
-            if (Array.isArray(data)) {
-                setOrdenes(data);
-            } else {
-                setOrdenes([]);
+            let queryParams = [`page=${pageNumber}`, `size=20`];
+
+            if (debouncedBusqueda.trim() !== '') {
+                queryParams.push(`busqueda=${encodeURIComponent(debouncedBusqueda.trim())}`);
             }
+            if (filtroActivo !== "Todas") {
+                queryParams.push(`estado=${encodeURIComponent(filtroActivo)}`);
+            }
+            if (fechaSeleccionada) {
+                const year = fechaSeleccionada.getFullYear();
+                const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
+                const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
+                queryParams.push(`fecha=${year}-${month}-${day}`);
+            } else if (debouncedBusqueda.trim() === '') {
+                const hoy = new Date();
+                const year = hoy.getFullYear();
+                const month = (hoy.getMonth() + 1).toString().padStart(2, '0');
+
+                queryParams.push(`fecha=${year}-${month}`);
+            }
+
+            const queryString = `?${queryParams.join('&')}`;
+            const endpoint = `/api/ordenes/movil/tarjetas${queryString}`;
+            const data = await apiFetch(endpoint);
+            const esArreglo = Array.isArray(data);
+            const nuevasOrdenes = esArreglo ? data : (data.content || []);
+            const esUltima = esArreglo ? true : (data.last ?? (nuevasOrdenes.length < 20));
+
+            if (pageNumber === 0) {
+                setOrdenes(nuevasOrdenes);
+            } else {
+                setOrdenes(prev => {
+                    const idsExistentes = new Set(prev.map(o => o.idOrden));
+                    const filtradas = nuevasOrdenes.filter((o: OrdenCard) => !idsExistentes.has(o.idOrden));
+                    return [...prev, ...filtradas];
+                });
+            }
+
+            setIsLastPage(esUltima);
+            setPage(pageNumber);
+
         } catch (error: any) {
-            console.error("Error: ", error);
-            setOrdenes([]);
+            console.error("Error al obtener órdenes: ", error);
+            if (pageNumber === 0) setOrdenes([]);
+            setIsLastPage(true);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
             setRefreshing(false);
         }
     };
 
     useEffect(() => {
-        fetchOrdenes();
-    }, []);
+        fetchOrdenes(0);
+    }, [debouncedBusqueda, filtroActivo, fechaSeleccionada]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        fetchOrdenes();
-    }, []);
+        fetchOrdenes(0);
+    }, [debouncedBusqueda, filtroActivo, fechaSeleccionada]);
+
+    const cargarMasOrdenes = () => {
+        if (!isLastPage && !loadingMore && !loading && !refreshing) {
+            fetchOrdenes(page + 1);
+        }
+    };
 
     const getStatusColor = (clave: string) => {
         if (!clave) return "#3A88F6";
@@ -68,61 +176,6 @@ export default function OrdenesScreen() {
         if (clave.includes('ATRASADA') || clave.includes('CANCELADA') || clave.includes('RECHAZADO')) return "#FE5F5F";
         return "#3A88F6";
     }
-
-    const getOrdenesFiltradas = () => {
-        return ordenes.filter((orden) => {
-            // 1. FILTRO DE FECHA (CALENDARIO O MES ACTUAL)
-            if (fechaSeleccionada) {
-                if (!orden.fechaIso) return false;
-                const year = fechaSeleccionada.getFullYear();
-                const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
-                const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
-                const fechaFiltroStr = `${year}-${month}-${day}`;
-
-                if (orden.fechaIso !== fechaFiltroStr) return false;
-            } else {
-                // FILTRO DE ACCESO RÁPIDO (MES ACTUAL)
-                const hoy = new Date();
-                const mesActual = (hoy.getMonth() + 1).toString().padStart(2, '0');
-                const anioActual = hoy.getFullYear().toString();
-
-                if (!orden.fechaIso) return false;
-
-                const [anioOrden, mesOrden] = orden.fechaIso.split('-');
-
-                if (anioOrden !== anioActual || mesOrden !== mesActual) {
-                    return false;
-                }
-            }
-
-            // 2. FILTROS DE ESTATUS
-            if (filtroActivo === "Todas") return true;
-
-            if (filtroActivo === "Completadas") {
-                return orden.claveEstatus === 'ORD_ENTREGADA';
-            }
-
-            if (filtroActivo === "Canceladas") {
-                return orden.claveEstatus && (
-                    orden.claveEstatus.includes('CANCELADA') ||
-                    orden.claveEstatus.includes('RECHAZADO') ||
-                    orden.claveEstatus.includes('ATRASADA')
-                );
-            }
-
-            if (filtroActivo === "En curso") {
-                return orden.claveEstatus !== 'ORD_ENTREGADA' &&
-                    (!orden.claveEstatus || (
-                        !orden.claveEstatus.includes('CANCELADA') &&
-                        !orden.claveEstatus.includes('RECHAZADO')
-                    ));
-            }
-
-            return true;
-        });
-    };
-
-    const listaParaMostrar = getOrdenesFiltradas();
 
     const onDateChange = (event: any, selectedDate?: Date) => {
         if (Platform.OS === 'android') {
@@ -166,6 +219,53 @@ export default function OrdenesScreen() {
 
     const listaProductos = obtenerProductosDetalle();
 
+    const renderTarjetaOrden = ({ item }: { item: OrdenCard }) => {
+        const colorTema = getStatusColor(item.claveEstatus);
+        return (
+            <TouchableOpacity onPress={() => abrirDetalle(item)} activeOpacity={0.8}>
+                <View style={styles.cardContainer}>
+                    <View style={[styles.cardColorBar, { backgroundColor: colorTema }]}></View>
+                    <View style={styles.cardContent}>
+                        <Text style={styles.cardNombre}>{item.nombreCliente}</Text>
+                        <View style={styles.cardFila}>
+                            <View style={styles.cardFechaContainer}>
+                                <FontAwesomeIcon icon={faCalendarDays} size={14} color={colorTema} style={{ marginRight: 6 }} />
+                                <Text style={[styles.cardFechaTexto, { color: colorTema }]}>
+                                    {formatearFechaEspanol(item.fechaIso)}
+                                </Text>
+                            </View>
+                            <View style={styles.filtroSpacer}></View>
+                            <View style={[styles.cardPill, { backgroundColor: colorTema }]}>
+                                <Text style={styles.cardPillTexto}>{item.estatus}</Text>
+                            </View>
+                        </View>
+                        <Text style={styles.cardDescripcion} numberOfLines={1} ellipsizeMode="tail">
+                            {item.productoPrincipal}
+                        </Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderCabecera = () => (
+        <View style={{ paddingBottom: 15 }}>
+            <Text style={styles.titulo}>{"Filtro de Órdenes"}</Text>
+            <View style={styles.filtrosContainer}>
+                {opcionesFiltro.map((opcion) => (
+                    <TouchableOpacity key={opcion} onPress={() => setFiltroActivo(opcion)}>
+                        <Text style={[
+                            styles.filtroTexto,
+                            filtroActivo === opcion && styles.filtroTextoActivo
+                        ]}>
+                            {opcion}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+    );
+
     return (
         <>
             <Stack.Screen
@@ -173,42 +273,19 @@ export default function OrdenesScreen() {
                     headerShown: true,
                     headerTitle: "Órdenes",
                     headerTitleAlign: 'center',
-                    headerTitleStyle: {
-                        fontFamily: "LexendTera-SemiBold",
-                        fontSize: 15
-                    },
+                    headerTitleStyle: { fontFamily: "LexendTera-SemiBold", fontSize: 15 },
                     headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
                     headerRight: () => (
                         <View style={{ marginRight: 20 }}>
                             {Platform.OS === 'web' ? (
                                 <div style={{ position: 'relative' }}>
-                                    <FontAwesomeIcon
-                                        icon={faCalendarDays}
-                                        size={20}
-                                        color={fechaSeleccionada ? "#3A88F6" : "#525252"}
-                                    />
-                                    <input
-                                        type="date"
-                                        onChange={onWebDateChange}
-                                        style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            width: '100%',
-                                            height: '100%',
-                                            opacity: 0,
-                                            cursor: 'pointer'
-                                        }}
-                                    />
+                                    <FontAwesomeIcon icon={faCalendarDays} size={20} color={fechaSeleccionada ? "#3A88F6" : "#525252"} />
+                                    <input type="date" onChange={onWebDateChange} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
                                 </div>
                             ) : (
                                 <TouchableOpacity onPress={() => setMostrarCalendario(true)}>
-                                    <FontAwesomeIcon
-                                        icon={faCalendarDays}
-                                        size={20}
-                                        color={fechaSeleccionada ? "#3A88F6" : "#525252"}
-                                    />
+                                    <FontAwesomeIcon icon={faCalendarDays} size={20} color={fechaSeleccionada ? "#3A88F6" : "#525252"} />
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -217,6 +294,29 @@ export default function OrdenesScreen() {
             />
 
             <View style={styles.container}>
+
+                <View style={styles.searchContainer}>
+                    <FontAwesomeIcon icon={faSearch} size={16} color="#9CA3AF" style={styles.searchIcon} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Buscar por cliente, folio o producto..."
+                        placeholderTextColor="#9CA3AF"
+                        value={busqueda}
+                        onChangeText={setBusqueda}
+                        returnKeyType="search"
+                        clearButtonMode="never"
+                    />
+
+                    {busqueda.length > 0 && (
+                        <TouchableOpacity
+                            onPress={() => setBusqueda('')}
+                            style={{ padding: 5 }}
+                        >
+                            <FontAwesomeIcon icon={faTimes} size={16} color="#9CA3AF" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
                 {fechaSeleccionada && (
                     <View style={styles.filtroFechaContainer}>
                         <Text style={styles.filtroFechaTexto}>
@@ -228,81 +328,39 @@ export default function OrdenesScreen() {
                     </View>
                 )}
 
-                <ScrollView
-                    contentContainerStyle={styles.scrollContainer}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            colors={["#3A88F6"]}
-                            tintColor="#3A88F6"
-                        />
-                    }
-                >
-                    <Text style={styles.titulo}>{"Filtro de Órdenes"}</Text>
+                {loading && page === 0 ? (
+                    <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 40 }} />
+                ) : (
+                    <FlatList
+                        data={ordenes}
+                        keyExtractor={(item) => item.idOrden.toString()}
+                        renderItem={renderTarjetaOrden}
+                        ListHeaderComponent={renderCabecera}
+                        contentContainerStyle={[styles.scrollContainer, { paddingBottom: 30 }]}
 
-                    <View style={styles.filtrosContainer}>
-                        {opcionesFiltro.map((opcion) => (
-                            <TouchableOpacity key={opcion} onPress={() => setFiltroActivo(opcion)}>
-                                <Text style={[
-                                    styles.filtroTexto,
-                                    filtroActivo === opcion && styles.filtroTextoActivo
-                                ]}>
-                                    {opcion}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                        refreshControl={
+                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#3A88F6"]} tintColor="#3A88F6" />
+                        }
 
-                    {loading && !refreshing ? (
-                        <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 20 }} />
-                    ) : (
-                        listaParaMostrar.map((item) => {
-                            const colorTema = getStatusColor(item.claveEstatus);
+                        onEndReached={cargarMasOrdenes}
+                        onEndReachedThreshold={0.2}
 
-                            return (
-                                <TouchableOpacity
-                                    key={item.idOrden}
-                                    onPress={() => abrirDetalle(item)}
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={styles.cardContainer}>
-                                        <View style={[styles.cardColorBar, { backgroundColor: colorTema }]}></View>
-                                        <View style={styles.cardContent}>
-                                            <Text style={styles.cardNombre}>{item.nombreCliente}</Text>
-                                            <View style={styles.cardFila}>
-                                                <View style={styles.cardFechaContainer}>
-                                                    <FontAwesomeIcon
-                                                        icon={faCalendarDays}
-                                                        size={14}
-                                                        color={colorTema}
-                                                        style={{ marginRight: 6 }}
-                                                    />
-                                                    <Text style={[styles.cardFechaTexto, { color: colorTema }]}>
-                                                        {item.fecha || "Sin fecha"}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.filtroSpacer}></View>
-                                                <View style={[styles.cardPill, { backgroundColor: colorTema }]}>
-                                                    <Text style={styles.cardPillTexto}>{item.estatus}</Text>
-                                                </View>
-                                            </View>
-                                            <Text
-                                                style={styles.cardDescripcion}
-                                                numberOfLines={1}
-                                                ellipsizeMode="tail"
-                                            >
-                                                {item.productoPrincipal}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </TouchableOpacity>
-                            );
-                        })
-                    )}
-                </ScrollView>
+                        ListFooterComponent={
+                            loadingMore ? (
+                                <View style={{ paddingVertical: 20, alignItems: 'center', justifyContent: 'center' }}>
+                                    <ActivityIndicator size="small" color="#3A88F6" />
+                                </View>
+                            ) : null
+                        }
 
-                {/* MODAL DEL CALENDARIO (IOS/ANDROID) */}
+                        ListEmptyComponent={
+                            <View style={{ alignItems: 'center', marginTop: 40 }}>
+                                <Text style={{ color: '#9CA3AF', fontSize: 16 }}>No se encontraron órdenes</Text>
+                            </View>
+                        }
+                    />
+                )}
+
                 {mostrarCalendario && Platform.OS !== 'web' && (
                     Platform.OS === 'ios' ? (
                         <Modal transparent={true} animationType="fade" visible={mostrarCalendario} onRequestClose={cerrarCalendario}>
@@ -313,45 +371,20 @@ export default function OrdenesScreen() {
                                             <Text style={styles.iosButtonText}>Listo</Text>
                                         </TouchableOpacity>
                                     </View>
-                                    <DateTimePicker
-                                        value={fechaSeleccionada || new Date()}
-                                        mode="date"
-                                        display="spinner"
-                                        onChange={onDateChange}
-                                        textColor="#000000"
-                                        themeVariant="light"
-                                    />
+                                    <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="spinner" onChange={onDateChange} textColor="#000000" themeVariant="light" />
                                 </View>
                             </TouchableOpacity>
                         </Modal>
                     ) : (
-                        <DateTimePicker
-                            value={fechaSeleccionada || new Date()}
-                            mode="date"
-                            display="default"
-                            onChange={onDateChange}
-                        />
+                        <DateTimePicker value={fechaSeleccionada || new Date()} mode="date" display="default" onChange={onDateChange} />
                     )
                 )}
 
-                {/* MODAL DE DETALLE DE LA ORDEN */}
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={modalDetalleVisible}
-                    onRequestClose={() => setModalDetalleVisible(false)}
-                >
+                <Modal animationType="slide" transparent={true} visible={modalDetalleVisible} onRequestClose={() => setModalDetalleVisible(false)}>
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
                             <View style={styles.modalHeader}>
-                                <View style={[
-                                    styles.cardPill,
-                                    {
-                                        backgroundColor: getStatusColor(ordenSeleccionada?.claveEstatus || ""),
-                                        width: 'auto',
-                                        paddingHorizontal: 15
-                                    }
-                                ]}>
+                                <View style={[styles.cardPill, { backgroundColor: getStatusColor(ordenSeleccionada?.claveEstatus || ""), width: 'auto', paddingHorizontal: 15 }]}>
                                     <Text style={styles.cardPillTexto}>{ordenSeleccionada?.estatus}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setModalDetalleVisible(false)}>
@@ -363,9 +396,7 @@ export default function OrdenesScreen() {
                             <View style={styles.divider} />
 
                             <View style={styles.detailRow}>
-                                <View style={styles.iconContainer}>
-                                    <FontAwesomeIcon icon={faUser} size={18} color="#3A88F6" />
-                                </View>
+                                <View style={styles.iconContainer}><FontAwesomeIcon icon={faUser} size={18} color="#3A88F6" /></View>
                                 <View style={styles.detailTextContainer}>
                                     <Text style={styles.detailLabel}>Cliente</Text>
                                     <Text style={styles.detailValue}>{ordenSeleccionada?.nombreCliente}</Text>
@@ -373,29 +404,17 @@ export default function OrdenesScreen() {
                             </View>
 
                             <View style={[styles.detailRow, { alignItems: 'flex-start' }]}>
-                                <View style={[styles.iconContainer, { marginTop: 2 }]}>
-                                    <FontAwesomeIcon icon={faBoxOpen} size={18} color="#3A88F6" />
-                                </View>
+                                <View style={[styles.iconContainer, { marginTop: 2 }]}><FontAwesomeIcon icon={faBoxOpen} size={18} color="#3A88F6" /></View>
                                 <View style={styles.detailTextContainer}>
                                     <Text style={styles.detailLabel}>Productos ({listaProductos.length})</Text>
                                     {listaProductos.length > 0 ? (
                                         <View style={styles.listaProductosContainer}>
-                                            <ScrollView
-                                                nestedScrollEnabled={true}
-                                                showsVerticalScrollIndicator={true}
-                                                contentContainerStyle={{ paddingRight: 5 }}
-                                            >
+                                            <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={true} contentContainerStyle={{ paddingRight: 5 }}>
                                                 {listaProductos.map((item: any, index: number) => (
                                                     <View key={index} style={styles.productoFila}>
-                                                        <Text style={styles.productoCantidad}>
-                                                            {item.cantidad}
-                                                        </Text>
-                                                        <Text style={styles.productoEquis}>
-                                                            x
-                                                        </Text>
-                                                        <Text style={styles.productoDescripcion}>
-                                                            {item.descripcion}
-                                                        </Text>
+                                                        <Text style={styles.productoCantidad}>{item.cantidad}</Text>
+                                                        <Text style={styles.productoEquis}>x</Text>
+                                                        <Text style={styles.productoDescripcion}>{item.descripcion}</Text>
                                                     </View>
                                                 ))}
                                             </ScrollView>
@@ -407,9 +426,7 @@ export default function OrdenesScreen() {
                             </View>
 
                             <View style={styles.detailRow}>
-                                <View style={styles.iconContainer}>
-                                    <FontAwesomeIcon icon={faUserTie} size={18} color="#3A88F6" />
-                                </View>
+                                <View style={styles.iconContainer}><FontAwesomeIcon icon={faUserTie} size={18} color="#3A88F6" /></View>
                                 <View style={styles.detailTextContainer}>
                                     <Text style={styles.detailLabel}>Encargado</Text>
                                     <Text style={styles.detailValue}>{ordenSeleccionada?.nombreEncargado}</Text>
@@ -417,9 +434,7 @@ export default function OrdenesScreen() {
                             </View>
 
                             <View style={styles.detailRow}>
-                                <View style={styles.iconContainer}>
-                                    <FontAwesomeIcon icon={faClock} size={18} color="#3A88F6" />
-                                </View>
+                                <View style={styles.iconContainer}><FontAwesomeIcon icon={faClock} size={18} color="#3A88F6" /></View>
                                 <View style={styles.detailTextContainer}>
                                     <Text style={styles.detailLabel}>Estatus Actual</Text>
                                     <Text style={styles.detailValue}>{ordenSeleccionada?.descripcionEstatus}</Text>
@@ -432,7 +447,7 @@ export default function OrdenesScreen() {
                                 </View>
                                 <View style={styles.detailTextContainer}>
                                     <Text style={styles.detailLabel}>Entrega Estimada</Text>
-                                    <Text style={styles.detailValue}>{ordenSeleccionada?.fechaEntrega}</Text>
+                                    <Text style={styles.detailValue}>{formatearFechaEntregaEspanol(ordenSeleccionada?.fechaEntrega)}</Text>
                                 </View>
                             </View>
 
@@ -440,17 +455,10 @@ export default function OrdenesScreen() {
 
                             <View style={styles.totalRow}>
                                 <View style={styles.totalFila}>
-                                    <FontAwesomeIcon
-                                        icon={faFileInvoiceDollar}
-                                        size={24}
-                                        color={ordenSeleccionada?.claveEstatus?.includes('CANCELADA') ? "#FE5F5F" : "#7CCB64"}
-                                    />
+                                    <FontAwesomeIcon icon={faFileInvoiceDollar} size={24} color={ordenSeleccionada?.claveEstatus?.includes('CANCELADA') ? "#FE5F5F" : "#7CCB64"} />
                                     <Text style={styles.totalLabel}>Total de Venta</Text>
                                 </View>
-                                <Text style={[
-                                    styles.totalValue,
-                                    ordenSeleccionada?.claveEstatus?.includes('CANCELADA') && styles.textoTachado
-                                ]}>
+                                <Text style={[styles.totalValue, ordenSeleccionada?.claveEstatus?.includes('CANCELADA') && styles.textoTachado]}>
                                     ${ordenSeleccionada?.montoTotal?.toFixed(2)}
                                 </Text>
                             </View>
@@ -471,7 +479,6 @@ export default function OrdenesScreen() {
                             <TouchableOpacity style={styles.closeButtonFull} onPress={() => setModalDetalleVisible(false)}>
                                 <Text style={styles.closeButtonText}>Cerrar</Text>
                             </TouchableOpacity>
-
                         </View>
                     </View>
                 </Modal>
@@ -479,6 +486,7 @@ export default function OrdenesScreen() {
         </>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: {
@@ -741,5 +749,25 @@ const styles = StyleSheet.create({
         color: '#555',
         fontWeight: 'bold',
         fontSize: 16
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
+        paddingHorizontal: 15,
+        height: 45,
+        marginHorizontal: 20,
+        marginTop: 15,
+        marginBottom: 5,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        color: '#374151',
+        height: '100%',
     },
 });
