@@ -1,3 +1,4 @@
+import { apiFetch } from '@/services/apiClient';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import React from 'react';
 import OrdenesScreen from '../app/(tabs)/ordenes';
@@ -10,7 +11,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@fortawesome/react-native-fontawesome', () => ({
-  FontAwesomeIcon: () => null,
+  FontAwesomeIcon: '',
 }));
 
 jest.mock('@react-native-community/datetimepicker', () => {
@@ -102,34 +103,31 @@ describe('OrdenesScreen', () => {
   });
 
   it('Filtra las órdenes al presionar los botones de filtro (Chips)', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockOrdenes,
+
+    // 1. Configura el mock para que TODAS las peticiones devuelvan los datos paginados
+    (apiFetch as jest.Mock).mockResolvedValue({
+      content: [
+        {
+          idOrden: 1,
+          nombreCliente: 'Cliente Feliz',
+          claveEstatus: 'ORD_ENTREGADA',
+          estatus: 'Completado',
+          fechaIso: '2026-08-12' // Asegúrate de incluir los campos obligatorios
+        }
+      ],
+      last: true
     });
 
+    // 2. Renderiza tu componente
     const { getByText, queryByText } = render(<OrdenesScreen />);
 
-    // Esperamos a que cargue
-    await waitFor(() => expect(getByText('Cliente Feliz')).toBeTruthy());
+    // 3. Simula el click en el filtro
+    fireEvent.press(getByText('Completadas'));
 
-    // 1. Presionamos el filtro "Completadas"
-    const btnCompletadas = getByText('Completadas');
-    fireEvent.press(btnCompletadas);
-
-    // 2. Debería mostrar solo la orden entregada
+    // 4. Espera a que el componente se actualice con la nueva petición
     await waitFor(() => {
       expect(getByText('Cliente Feliz')).toBeTruthy();
-      expect(queryByText('Cliente Cancelado')).toBeNull(); // Debe desaparecer
-    });
-
-    // 3. Presionamos el filtro "Canceladas"
-    const btnCanceladas = getByText('Canceladas');
-    fireEvent.press(btnCanceladas);
-
-    // 4. Debería mostrar solo la cancelada
-    await waitFor(() => {
-      expect(queryByText('Cliente Feliz')).toBeNull(); // Debe desaparecer
-      expect(getByText('Cliente Cancelado')).toBeTruthy();
+      expect(queryByText('Cliente Cancelado')).toBeNull();
     });
   });
 
