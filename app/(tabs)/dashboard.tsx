@@ -53,7 +53,7 @@ export default function DashboardScreen() {
 
     const fetchFinanzas = async () => {
         try {
-            const data = await apiFetch(`/api/dashboard/finanzas?filtro=${filtroTiempo}`);
+            const data = await apiFetch(`/api/dashboard/finanzas/grafica-app?filtro=${filtroTiempo}`);
             setFinanzas(data);
         } catch (error: any) {
             console.error("Error finanzas:", error);
