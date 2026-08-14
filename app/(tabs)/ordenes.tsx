@@ -234,7 +234,6 @@ export default function OrdenesScreen() {
                                     {formatearFechaEspanol(item.fechaIso)}
                                 </Text>
                             </View>
-                            <View style={styles.filtroSpacer}></View>
                             <View style={[styles.cardPill, { backgroundColor: colorTema }]}>
                                 <Text style={styles.cardPillTexto}>{item.estatus}</Text>
                             </View>
@@ -247,24 +246,6 @@ export default function OrdenesScreen() {
             </TouchableOpacity>
         );
     };
-
-    const renderCabecera = () => (
-        <View style={{ paddingBottom: 15 }}>
-            <Text style={styles.titulo}>{"Filtro de Órdenes"}</Text>
-            <View style={styles.filtrosContainer}>
-                {opcionesFiltro.map((opcion) => (
-                    <TouchableOpacity key={opcion} onPress={() => setFiltroActivo(opcion)}>
-                        <Text style={[
-                            styles.filtroTexto,
-                            filtroActivo === opcion && styles.filtroTextoActivo
-                        ]}>
-                            {opcion}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </View>
-    );
 
     return (
         <>
@@ -293,13 +274,34 @@ export default function OrdenesScreen() {
                 }}
             />
 
+            <View style={styles.headerExtension}>
+                <View style={styles.tabsBackground}>
+                    {opcionesFiltro.map((opcion) => (
+                        <TouchableOpacity
+                            key={opcion}
+                            onPress={() => setFiltroActivo(opcion)}
+                            style={[
+                                styles.tab,
+                            ]}
+                        >
+                            <Text style={[
+                                styles.tabText,
+                                filtroActivo === opcion && styles.tabTextActive
+                            ]}>
+                                {opcion}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
             <View style={styles.container}>
 
                 <View style={styles.searchContainer}>
                     <FontAwesomeIcon icon={faSearch} size={16} color="#9CA3AF" style={styles.searchIcon} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Buscar por cliente, folio o producto..."
+                        placeholder="Buscar por cliente, órden o producto..."
                         placeholderTextColor="#9CA3AF"
                         value={busqueda}
                         onChangeText={setBusqueda}
@@ -335,7 +337,6 @@ export default function OrdenesScreen() {
                         data={ordenes}
                         keyExtractor={(item) => item.idOrden.toString()}
                         renderItem={renderTarjetaOrden}
-                        ListHeaderComponent={renderCabecera}
                         contentContainerStyle={[styles.scrollContainer, { paddingBottom: 30 }]}
 
                         refreshControl={
@@ -487,14 +488,54 @@ export default function OrdenesScreen() {
     );
 }
 
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#F5F5F5"
     },
+    headerExtension: {
+        backgroundColor: '#FFFFFF',
+        paddingTop: 10,
+        paddingBottom: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        zIndex: 10,
+    },
+    tabsBackground: {
+        flexDirection: 'row',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        padding: 4,
+        height: 35,
+        marginHorizontal: 20,
+    },
+    tab: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+        paddingVertical: 5,
+    },
+    tabActive: {
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    tabText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#6B7280',
+    },
+    tabTextActive: {
+        color: '#3A88F6',
+        fontWeight: 'bold'
+    },
     scrollContainer: {
-        padding: 20
+        padding: 20,
+        paddingTop: 10,
     },
     titulo: {
         fontSize: 13,
@@ -518,30 +559,6 @@ const styles = StyleSheet.create({
     filtroReestablecer: {
         color: '#FF5555',
         fontWeight: 'bold'
-    },
-    filtrosContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 25,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        marginBottom: 20,
-        width: '100%',
-    },
-    filtroTexto: {
-        fontSize: 13,
-        color: '#9E9E9E'
-    },
-    filtroTextoActivo: {
-        color: '#3A88F6',
-        fontWeight: 'bold'
-    },
-    filtroSpacer: {
-        width: 10
     },
     cardContainer: {
         flexDirection: 'row',
@@ -753,13 +770,18 @@ const styles = StyleSheet.create({
     searchContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#FFFFFF',
         borderRadius: 10,
         paddingHorizontal: 15,
         height: 45,
         marginHorizontal: 20,
         marginTop: 15,
         marginBottom: 5,
+        elevation: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2
     },
     searchIcon: {
         marginRight: 10,
