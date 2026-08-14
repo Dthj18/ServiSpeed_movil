@@ -51,7 +51,7 @@ export default function CotizacionesScreen() {
         if (tipo === 'semana') {
             const diaSemana = inicio.getDay() || 7;
             inicio.setDate(inicio.getDate() - diaSemana + 1);
-            fin.setDate(inicio.getDate() + (7 - diaSemana));
+            fin.setDate(fin.getDate() + (7 - diaSemana));
         } else if (tipo === 'mes') {
             inicio.setDate(1);
             fin.setMonth(fin.getMonth() + 1, 0);
