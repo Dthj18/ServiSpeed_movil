@@ -499,11 +499,11 @@ const styles = StyleSheet.create({
         paddingBottom: 15,
         borderBottomWidth: 1,
         borderBottomColor: '#F3F4F6',
-        zIndex: 10,
     },
     tabsBackground: {
         flexDirection: 'row',
         backgroundColor: '#F3F4F6',
+        justifyContent: 'space-evenly',
         borderRadius: 12,
         padding: 4,
         height: 35,
@@ -515,6 +515,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderRadius: 8,
         paddingVertical: 5,
+        paddingHorizontal: 1,
     },
     tabActive: {
         backgroundColor: '#FFFFFF',
