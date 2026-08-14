@@ -166,9 +166,9 @@ describe('OrdenesScreen', () => {
 
     const { getByText } = render(<OrdenesScreen />);
 
-    // Verificamos que la pantalla renderice la cabecera sin crashear
+    // Verificamos que la pantalla renderice la interfaz sin crashear y muestre la lista vacía
     await waitFor(() => {
-      expect(getByText('Filtro de Órdenes')).toBeTruthy();
+      expect(getByText('No se encontraron órdenes')).toBeTruthy();
     });
   });
 
