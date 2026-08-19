@@ -1,5 +1,5 @@
 import { apiFetch } from '@/services/apiClient';
-import { faBoxOpen, faCalendarDays, faClock, faFileInvoiceDollar, faSearch, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
+import { faBoxOpen, faCalendarDays, faFileInvoiceDollar, faMoneyBillWave, faSearch, faTimes, faTruck, faUser, faUserTie } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack, useRouter } from 'expo-router';
@@ -17,6 +17,7 @@ interface OrdenCard {
     fechaIso: string;
     nombreEncargado: string;
     montoTotal: number;
+    montoPagado: number;
     fechaEntrega: string;
     descripcionEstatus: string;
 }
@@ -33,7 +34,7 @@ export default function OrdenesScreen() {
     const [loadingMore, setLoadingMore] = useState(false);
 
     const [filtroActivo, setFiltroActivo] = useState("Todas");
-    const opcionesFiltro = ["Todas", "En curso", "Completadas", "Canceladas"];
+    const opcionesFiltro = ["Todas", "En curso", "Listas", "Canceladas"];
     const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
     const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
@@ -217,6 +218,16 @@ export default function OrdenesScreen() {
         }
     };
 
+    const formatoMoneda = (cantidad: any) => {
+        if (cantidad === null || cantidad === undefined) return "$0.00";
+        const numero = Number(cantidad);
+        if (isNaN(numero)) return "$0.00";
+        return new Intl.NumberFormat('es-MX', {
+            style: 'currency',
+            currency: 'MXN'
+        }).format(numero);
+    };
+
     const listaProductos = obtenerProductosDetalle();
 
     const renderTarjetaOrden = ({ item }: { item: OrdenCard }) => {
@@ -276,22 +287,32 @@ export default function OrdenesScreen() {
 
             <View style={styles.headerExtension}>
                 <View style={styles.tabsBackground}>
-                    {opcionesFiltro.map((opcion) => (
-                        <TouchableOpacity
-                            key={opcion}
-                            onPress={() => setFiltroActivo(opcion)}
-                            style={[
-                                styles.tab,
-                            ]}
-                        >
-                            <Text style={[
-                                styles.tabText,
-                                filtroActivo === opcion && styles.tabTextActive
-                            ]}>
-                                {opcion}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                    {opcionesFiltro.map((opcion) => {
+                        const isActive = filtroActivo === opcion;
+
+                        return (
+                            <TouchableOpacity
+                                key={opcion}
+                                onPress={() => setFiltroActivo(opcion)}
+                                activeOpacity={0.8}
+                                style={[
+                                    styles.tab,
+                                    isActive && styles.tabActive
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.tabText,
+                                        isActive && styles.tabTextActive
+                                    ]}
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                >
+                                    {opcion}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
             </View>
 
@@ -435,12 +456,32 @@ export default function OrdenesScreen() {
                             </View>
 
                             <View style={styles.detailRow}>
-                                <View style={styles.iconContainer}><FontAwesomeIcon icon={faClock} size={18} color="#3A88F6" /></View>
+                                <View style={styles.iconContainer}>
+                                    <FontAwesomeIcon icon={faMoneyBillWave} size={18} color="#3A88F6" />
+                                </View>
                                 <View style={styles.detailTextContainer}>
-                                    <Text style={styles.detailLabel}>Estatus Actual</Text>
-                                    <Text style={styles.detailValue}>{ordenSeleccionada?.descripcionEstatus}</Text>
+                                    <Text style={styles.detailLabel}>Monto pagado</Text>
+                                    <Text style={styles.detailValue}>
+                                        {formatoMoneda(ordenSeleccionada?.montoPagado || 0)}
+                                    </Text>
                                 </View>
                             </View>
+
+                            {((ordenSeleccionada?.montoTotal || 0) - (ordenSeleccionada?.montoPagado || 0)) > 0 && (
+                                <View style={styles.detailRow}>
+                                    <View style={styles.iconContainer}>
+                                        <FontAwesomeIcon icon={faFileInvoiceDollar} size={18} color="#FF6B6B" />
+                                    </View>
+                                    <View style={styles.detailTextContainer}>
+                                        <Text style={styles.detailLabel}>Falta por cobrar</Text>
+                                        <Text style={[styles.detailValue, { color: '#FF6B6B', fontWeight: 'bold' }]}>
+                                            {formatoMoneda(
+                                                (ordenSeleccionada?.montoTotal || 0) - (ordenSeleccionada?.montoPagado || 0)
+                                            )}
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
 
                             <View style={styles.detailRow}>
                                 <View style={styles.iconContainer}>
@@ -495,27 +536,25 @@ const styles = StyleSheet.create({
     },
     headerExtension: {
         backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
         paddingTop: 10,
         paddingBottom: 15,
         borderBottomWidth: 1,
-        borderBottomColor: '#F3F4F6',
+        borderBottomColor: '#E5E7EB',
+        zIndex: 10,
     },
     tabsBackground: {
         flexDirection: 'row',
         backgroundColor: '#F3F4F6',
-        justifyContent: 'space-evenly',
         borderRadius: 12,
         padding: 4,
         height: 35,
-        marginHorizontal: 20,
     },
     tab: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: 8,
-        paddingVertical: 5,
-        paddingHorizontal: 1,
     },
     tabActive: {
         backgroundColor: '#FFFFFF',
@@ -528,11 +567,13 @@ const styles = StyleSheet.create({
     tabText: {
         fontSize: 13,
         fontWeight: '500',
+        textAlign: 'center',
         color: '#6B7280',
+        width: '100%',
     },
     tabTextActive: {
         color: '#3A88F6',
-        fontWeight: 'bold'
+        fontWeight: '700',
     },
     scrollContainer: {
         padding: 20,
