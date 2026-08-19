@@ -5,7 +5,7 @@ import { faArrowRight, faChartSimple, faClipboardList, faFileInvoiceDollar, faWa
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Dimensions, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { BarChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -18,6 +18,7 @@ interface DashboardResumen {
     cotizacionesMes: number;
     ordenesActivas: number;
     pagosPendientes: number;
+    pagoTotal: number;
 }
 
 interface PuntoGrafica {
@@ -36,11 +37,22 @@ export default function DashboardScreen() {
     const [filtroTiempo, setFiltroTiempo] = useState('Semana');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        setError(false);
+
+        await Promise.all([fetchDashboardData(), fetchFinanzas]);
+
+        setRefreshing(false);
+    }, [filtroTiempo]);
 
     const [resumen, setResumen] = useState<DashboardResumen>({
         cotizacionesMes: 0,
         ordenesActivas: 0,
-        pagosPendientes: 0
+        pagosPendientes: 0,
+        pagoTotal: 0
     });
 
     const [finanzas, setFinanzas] = useState<FinanzasDTO>({
@@ -73,7 +85,6 @@ export default function DashboardScreen() {
     };
 
     const cargarTodo = useCallback(() => {
-        setLoading(true);
         setError(false);
         Promise.all([fetchDashboardData(), fetchFinanzas()]).finally(() => setLoading(false));
     }, [filtroTiempo]);
@@ -100,18 +111,22 @@ export default function DashboardScreen() {
             result.push({
                 value: item.ingresos,
                 label: item.label,
-                spacing: .5,
+                spacing: 2,
                 labelWidth: 45,
                 labelTextStyle: {
-                    color: '#6B7280', fontSize: 11, fontWeight: '500', marginTop: 4, textAlign: 'center',
-                    marginLeft: -8
+                    color: '#6B7280',
+                    fontSize: 10,
+                    fontWeight: '500',
+                    marginTop: 6,
+                    textAlign: 'center',
+                    marginLeft: 12
                 },
                 frontColor: COLOR_INGRESOS,
                 tipo: 'Ingresos'
             });
             result.push({
                 value: item.egresos,
-                spacing: finanzas.datosGrafica.length <= 5 ? 35 : 20,
+                spacing: finanzas.datosGrafica.length <= 5 ? 30 : 15,
                 frontColor: COLOR_EGRESOS,
                 tipo: 'Egresos'
             });
@@ -126,13 +141,14 @@ export default function DashboardScreen() {
             if (item.egresos > max) max = item.egresos;
         });
 
-        return max === 0 ? 100 : max * 1.3;
+        return max === 0 ? 100 : max * 1.40;
     }, [finanzas.datosGrafica]);
 
     const BotonFiltro = ({ texto }: { texto: string }) => (
         <TouchableOpacity
             style={[styles.periodButton, filtroTiempo === texto && styles.periodButtonActive]}
             onPress={() => setFiltroTiempo(texto)}
+            activeOpacity={0.7}
         >
             <Text style={[styles.periodText, filtroTiempo === texto && styles.periodTextActive]}>
                 {texto}
@@ -151,10 +167,17 @@ export default function DashboardScreen() {
     if (error) {
         return (
             <SafeAreaView style={[styles.container, styles.centered, { padding: 20 }]}>
-                <Text style={{ textAlign: 'center', color: '#6B7280', marginBottom: 15 }}>
+                <Text style={{ textAlign: 'center', color: '#6B7280', marginBottom: 15, fontSize: 16 }}>
                     No se pudo cargar la información del dashboard.
                 </Text>
-                <TouchableOpacity style={styles.retryButton} onPress={cargarTodo}>
+                <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={() => {
+                        setLoading(true);
+                        cargarTodo();
+                    }}
+                    activeOpacity={0.8}
+                >
                     <Text style={styles.retryButtonText}>Reintentar</Text>
                 </TouchableOpacity>
             </SafeAreaView>
@@ -170,62 +193,77 @@ export default function DashboardScreen() {
                     headerTitleAlign: 'center',
                     headerTitleStyle: {
                         fontFamily: "LexendTera-SemiBold",
-                        fontSize: 15,
-                        color: '#000000',
+                        fontSize: 16,
+                        color: '#111827',
                     },
                     headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
                     headerLeft: () => null,
                     headerRight: () => (
-                        <TouchableOpacity style={{ marginRight: 20 }}>
-                            <FontAwesomeIcon icon={faBell as IconProp} size={20} color="#525252" />
+                        <TouchableOpacity style={{ marginRight: 20 }} activeOpacity={0.7}>
+                            <FontAwesomeIcon icon={faBell as IconProp} size={22} color="#4B5563" />
                         </TouchableOpacity>
                     ),
                 }}
             />
 
             <SafeAreaView style={styles.container} edges={['left', 'right']}>
-                <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false} refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={['#5C7CFA']}
+                        tintColor="#5C7CFA"
+                    />
+                }>
 
                     <View style={styles.cardsGrid}>
-                        <TouchableOpacity style={[styles.card, { backgroundColor: '#5C7CFA' }]} onPress={() => router.push('/(tabs)/cotizaciones')}>
+                        <TouchableOpacity style={[styles.card, { backgroundColor: '#5C7CFA' }]} onPress={() => router.push('/(tabs)/cotizaciones')} activeOpacity={0.9}>
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faFileInvoiceDollar as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>{resumen.cotizacionesMes}</Text>
+                                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>{resumen.cotizacionesMes}</Text>
                             </View>
-                            <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Total cotizaciones</Text>
+                            <Text style={styles.cardLabel}>Cotizaciones del mes</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.card, { backgroundColor: '#4dabf7' }]} onPress={() => router.push('/(tabs)/ordenes')}>
+                        <TouchableOpacity style={[styles.card, { backgroundColor: '#4DABF7' }]} onPress={() => router.push('/(tabs)/ordenes')} activeOpacity={0.9}>
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faClipboardList as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>{resumen.ordenesActivas}</Text>
+                                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>{resumen.ordenesActivas}</Text>
                             </View>
-                            <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Total órdenes</Text>
+                            <Text style={styles.cardLabel}>Órdenes en curso</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.card, { backgroundColor: '#333333' }]}>
+                        <TouchableOpacity
+                            style={[styles.card, { backgroundColor: '#374151' }]}
+                            onPress={() => router.push({ pathname: '/(tabs)/ordenes', params: { filtro: 'Con Adeudo' } })}
+                            activeOpacity={0.9}
+                        >
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faWallet as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={[styles.cardValue, { color: '#FFFFFF' }]}>{resumen.pagosPendientes}</Text>
+                                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                                    {formatoMoneda(resumen.pagoTotal)}
+                                </Text>
                             </View>
-                            <Text style={[styles.cardLabel, { color: '#FFFFFF' }]}>Pagos pendientes</Text>
+                            <Text style={styles.cardLabel}>Total por cobrar</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={[styles.card, { backgroundColor: '#20C997' }]} onPress={() => router.push('/(tabs)/estadisticas')}>
+                        <TouchableOpacity style={[styles.card, { backgroundColor: '#20C997' }]} onPress={() => router.push('/(tabs)/estadisticas')} activeOpacity={0.9}>
                             <View style={styles.cardHeader}>
-                                <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }]}>
+                                <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faChartSimple as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <FontAwesomeIcon icon={faArrowRight as IconProp} size={20} color="#FFFFFF" />
+                                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                    <FontAwesomeIcon icon={faArrowRight as IconProp} size={20} color="#FFFFFF" />
+                                </View>
                             </View>
-                            <Text style={[styles.cardLabel, { color: '#FFFFFF', fontWeight: '700' }]}>Ver Reportes</Text>
+                            <Text style={[styles.cardLabel, { fontWeight: '700' }]}>Ver Reportes</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -233,7 +271,7 @@ export default function DashboardScreen() {
                     <View style={styles.financeCard}>
 
                         <View style={styles.financeHeaderRow}>
-                            <View style={{ flex: 1 }}>
+                            <View style={styles.financeTitleContainer}>
                                 <Text style={styles.sectionTitle}>Finanzas</Text>
                                 <Text style={styles.totalAmount} numberOfLines={1} adjustsFontSizeToFit>
                                     {formatoMoneda(finanzas.balanceTotal)}
@@ -253,40 +291,31 @@ export default function DashboardScreen() {
                                     key={JSON.stringify(chartData)}
                                     data={chartData}
                                     maxValue={topeGrafica}
-                                    rulesLength={screenWidth - 80}
-                                    barWidth={14}
+                                    rulesLength={screenWidth - 70}
+                                    barWidth={16}
                                     barBorderTopLeftRadius={4}
                                     barBorderTopRightRadius={4}
-                                    initialSpacing={10}
+                                    initialSpacing={15}
                                     yAxisThickness={0}
                                     xAxisThickness={0}
                                     yAxisTextStyle={{ color: '#9CA3AF', fontSize: 11 }}
                                     hideRules={false}
                                     rulesType="dashed"
                                     rulesColor="#E5E7EB"
-                                    height={230}
+                                    height={220}
                                     isAnimated
                                     animationDuration={400}
 
                                     renderTooltip={(item: any) => {
                                         return (
-                                            <View style={{
-                                                backgroundColor: '#1F2937',
-                                                paddingHorizontal: 12,
-                                                paddingVertical: 8,
-                                                borderRadius: 8,
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                                marginBottom: 5,
-                                                marginLeft: -10,
-                                            }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.frontColor, marginRight: 6 }} />
-                                                    <Text style={{ color: '#D1D5DB', fontSize: 10, fontWeight: '600' }}>
+                                            <View style={styles.tooltipContainer}>
+                                                <View style={styles.tooltipRow}>
+                                                    <View style={[styles.tooltipDot, { backgroundColor: item.frontColor }]} />
+                                                    <Text style={styles.tooltipType}>
                                                         {item.tipo}
                                                     </Text>
                                                 </View>
-                                                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' }}>
+                                                <Text style={styles.tooltipValue}>
                                                     {formatoMoneda(item.value)}
                                                 </Text>
                                             </View>
@@ -294,8 +323,8 @@ export default function DashboardScreen() {
                                     }}
                                 />
                             ) : (
-                                <View style={{ height: 220, justifyContent: 'center', alignItems: 'center' }}>
-                                    <Text style={{ color: '#999' }}>Sin datos para este período</Text>
+                                <View style={styles.emptyChartContainer}>
+                                    <Text style={styles.emptyChartText}>Sin datos para este período</Text>
                                 </View>
                             )}
                         </View>
@@ -306,10 +335,11 @@ export default function DashboardScreen() {
         </>
     );
 }
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFFFFF",
+        backgroundColor: "#F9FAFB",
     },
     centered: {
         justifyContent: 'center',
@@ -317,67 +347,75 @@ const styles = StyleSheet.create({
     },
     retryButton: {
         backgroundColor: '#5C7CFA',
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        elevation: 2,
     },
     retryButtonText: {
-        color: '#fff',
+        color: '#FFFFFF',
         fontWeight: '600',
+        fontSize: 15,
     },
     scrollContainer: {
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 30,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 40,
     },
     cardsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: 8,
     },
     card: {
         width: '48%',
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 15,
-        shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 15,
-        justifyContent: 'flex-start',
+        marginBottom: 12,
     },
     iconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 10,
     },
     cardValue: {
-        fontSize: 28,
+        flex: 1,
+        fontSize: 26,
+        color: '#FFFFFF',
         fontWeight: 'bold',
         fontFamily: 'LexendTera-SemiBold',
     },
     cardLabel: {
-        fontSize: 12,
-        opacity: 0.9,
+        fontSize: 13,
+        color: '#FFFFFF',
+        opacity: 0.95,
         fontWeight: '500',
+        lineHeight: 18,
     },
     financeCard: {
         backgroundColor: '#FFFFFF',
         borderRadius: 20,
         padding: 20,
-        marginTop: 10,
         marginBottom: 10,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
         elevation: 3,
         borderWidth: 1,
         borderColor: '#F3F4F6'
@@ -385,17 +423,23 @@ const styles = StyleSheet.create({
     financeHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 20,
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    financeTitleContainer: {
+        flex: 1,
+        paddingRight: 12
     },
     sectionTitle: {
         fontSize: 14,
         color: '#6B7280',
         fontWeight: '600',
         marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     totalAmount: {
-        fontSize: 20,
+        fontSize: 15,
         fontWeight: 'bold',
         color: '#111827',
         fontFamily: 'LexendTera-SemiBold',
@@ -403,23 +447,26 @@ const styles = StyleSheet.create({
     periodSelector: {
         flexDirection: 'row',
         backgroundColor: '#F3F4F6',
-        borderRadius: 12,
-        padding: 5,
-        marginLeft: 1,
+        borderRadius: 10,
+        padding: 4,
     },
     periodButton: {
         paddingVertical: 6,
-        paddingHorizontal: 9,
+        paddingHorizontal: 10,
         borderRadius: 8,
     },
     periodButtonActive: {
         backgroundColor: '#FFFFFF',
-        shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 1,
     },
     periodText: {
-        fontSize: 10,
+        fontSize: 12,
         color: '#6B7280',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     periodTextActive: {
         color: '#111827',
@@ -427,5 +474,55 @@ const styles = StyleSheet.create({
     },
     chartWrapper: {
         alignItems: 'center',
+        justifyContent: 'center',
+        paddingRight: 10,
+    },
+    tooltipContainer: {
+        backgroundColor: '#1F2937',
+        width: 100,
+        paddingVertical: 10,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 10,
+        marginLeft: -12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    tooltipRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6
+    },
+    tooltipDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 6
+    },
+    tooltipType: {
+        color: '#D1D5DB',
+        fontSize: 11,
+        fontWeight: '600'
+    },
+    tooltipValue: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginTop: 2,
+    },
+    emptyChartContainer: {
+        height: 220,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%'
+    },
+    emptyChartText: {
+        color: '#9CA3AF',
+        fontSize: 14,
+        fontWeight: '500'
     }
 });
