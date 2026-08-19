@@ -131,7 +131,7 @@ describe('OrdenesScreen', () => {
     const { getByText, queryByText, findByText } = render(<OrdenesScreen />);
 
     // 🛠️ AQUÍ ESTÁ LA MAGIA: findByText espera hasta que el loading termina y aparece el botón
-    const botonCompletadas = await findByText('Completadas');
+    const botonCompletadas = await findByText('Listas');
 
     // Simula el click en el filtro
     fireEvent.press(botonCompletadas);
