@@ -1,10 +1,18 @@
+import { apiFetch } from '@/services/apiClient';
 import { faBell, faChevronRight, faCircleQuestion, faEnvelope, faLock, faRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+    ActivityIndicator, Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView, StyleSheet,
+    Switch, Text, TextInput, TouchableOpacity, View
+} from "react-native";
 
 export default function PerfilScreen() {
     const router = useRouter();
@@ -27,43 +35,38 @@ export default function PerfilScreen() {
         useCallback(() => {
             const obtenerDatosDePersona = async () => {
                 try {
-                    const token = await AsyncStorage.getItem('userToken');
                     const jsonUser = await AsyncStorage.getItem('userData');
-                    if (!token || !jsonUser) return;
+                    if (!jsonUser) return;
+
                     const datosLocales = JSON.parse(jsonUser);
                     const idUsuario = datosLocales.idUsuario;
 
-                    const response = await fetch(`http://10.0.0.1:8081/api/usuarios/${idUsuario}`, {
-                        method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        }
+                    const persona = await apiFetch(`/api/usuarios/${idUsuario}`);
+
+                    setUserData({
+                        nombre: persona.nombre || persona.nombres || datosLocales.nombre || "Usuario",
+                        email: datosLocales.email,
+                        rol: datosLocales.rol
                     });
-                    if (response.ok) {
-                        const persona = await response.json();
+
+                } catch (error) {
+                    console.error("Error conectando al backend de Usuarios:", error);
+
+                    const jsonUser = await AsyncStorage.getItem('userData');
+                    if (jsonUser) {
+                        const datosLocales = JSON.parse(jsonUser);
                         setUserData({
-                            nombre: persona.nombre || persona.nombres || "Usuario",
-                            email: datosLocales.email,
-                            rol: datosLocales.rol
-                        });
-                    } else {
-                        setUserData({
-                            nombre: "Usuario (Error)",
+                            nombre: datosLocales.nombre || "Usuario (Sin conexión)",
                             email: datosLocales.email,
                             rol: datosLocales.rol
                         });
                     }
-
-                } catch (error) {
-                    console.error("Error conectando a Personas-Service:", error);
                 }
             };
 
             obtenerDatosDePersona();
         }, [])
     );
-
 
     const handleLogout = () => {
         Alert.alert(
@@ -100,62 +103,43 @@ export default function PerfilScreen() {
         }
 
         try {
-            const token = await AsyncStorage.getItem('userToken');
             const jsonUser = await AsyncStorage.getItem('userData');
-
-            if (!token || !jsonUser) {
+            if (!jsonUser) {
                 Alert.alert("Error", "No se encontró sesión activa. Reingresa a la app.");
                 return;
             }
 
             const { idUsuario } = JSON.parse(jsonUser);
 
-            const response = await fetch(`http://10.0.0.1:8081/api/usuarios/${idUsuario}/cambiar-password`, {
+            await apiFetch(`/api/usuarios/${idUsuario}/cambiar-password`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
+                body: {
                     passwordActual: passActual,
                     nuevaPassword: passNueva
-                })
+                }
             });
 
-            if (response.ok) {
-                Alert.alert("Éxito", "Tu contraseña ha sido actualizada correctamente");
-                setModalPasswordVisible(false);
-                setPassActual('');
-                setPassNueva('');
-                setPassConfirmar('');
+            Alert.alert("Éxito", "Tu contraseña ha sido actualizada correctamente");
+            setModalPasswordVisible(false);
+            setPassActual('');
+            setPassNueva('');
+            setPassConfirmar('');
+
+        } catch (error: any) {
+            const mensajeServidor = error.message || error.mensaje || error.data?.message || "";
+
+            if (error.status === 400 || mensajeServidor.toLowerCase().includes("incorrecta")) {
+                Alert.alert("Contraseña Incorrecta", "La contraseña actual que ingresaste no es la correcta. Inténtalo de nuevo.");
             } else {
-                const errorText = await response.text();
-
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    const mensajeServidor = errorJson.message || errorJson.mensaje || "";
-
-                    if (response.status === 400 || mensajeServidor.includes("incorrecta")) {
-                        Alert.alert("Contraseña Incorrecta", "La contraseña actual que ingresaste no es la correcta. Inténtalo de nuevo.");
-                    } else {
-                        Alert.alert("Error", mensajeServidor || "No se pudo actualizar la contraseña.");
-                    }
-
-                } catch {
-                    Alert.alert("Error", "El servidor respondió con error: " + response.status);
-                }
+                Alert.alert("Error", mensajeServidor || "No se pudo actualizar la contraseña. Revisa tu conexión.");
             }
-
-        } catch (error) {
-            console.error("ERROR DE CONEXIÓN:", error);
-            Alert.alert("Error", "Error de conexión con el servidor");
         }
     };
 
     const MenuOption = ({ icon, title, subtitle, onPress, showChevron = true, isDestructive = false }: any) => (
         <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
             <View style={[styles.iconBox, isDestructive && styles.iconBoxDestructive]}>
-                <FontAwesomeIcon icon={icon} size={18} color={isDestructive ? "#FE5F5F" : "#3A88F6"} />
+                <FontAwesomeIcon icon={icon} size={20} color={isDestructive ? "#FE5F5F" : "#3A88F6"} />
             </View>
             <View style={styles.menuTextContainer}>
                 <Text style={[styles.menuTitle, isDestructive && styles.menuTitleDestructive]}>{title}</Text>
@@ -173,29 +157,39 @@ export default function PerfilScreen() {
                     headerTitle: "Mi Perfil",
                     headerTitleAlign: 'center',
                     headerTitleStyle: { fontFamily: "LexendTera-SemiBold", fontSize: 15 },
-                    headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
+
+                    headerBackground: () => (
+                        <View style={{
+                            flex: 1,
+                            backgroundColor: '#FFFFFF',
+                            borderBottomWidth: 1,
+                            borderBottomColor: '#E5E7EB'
+                        }} />
+                    ),
                 }}
             />
 
-            <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+            <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-                {/* 1. Tarjeta de Usuario DINÁMICA */}
+                {/* 1. Tarjeta de Usuario */}
                 <View style={styles.profileCard}>
                     <View style={styles.avatarContainer}>
-                        <FontAwesomeIcon icon={faUser} size={40} color="#FFF" />
+                        <FontAwesomeIcon icon={faUser} size={35} color="#FFF" />
                     </View>
 
-                    {/* AQUI USAMOS LAS VARIABLES DEL ESTADO */}
                     <Text style={styles.userName}>{userData.nombre}</Text>
+
+                    {/* Le agregamos un identificador de sucursal/ubicación operativa */}
                     <Text style={styles.userRole}>{userData.rol}</Text>
 
                     <View style={styles.emailBadge}>
-                        <FontAwesomeIcon icon={faEnvelope} size={10} color="#666" style={{ marginRight: 5 }} />
+                        <FontAwesomeIcon icon={faEnvelope} size={12} color="#6B7280" style={{ marginRight: 6 }} />
                         <Text style={styles.userEmail}>{userData.email}</Text>
                     </View>
                 </View>
 
+                {/* 2. Sección Cuenta */}
                 <Text style={styles.sectionTitle}>Cuenta</Text>
                 <View style={styles.menuContainer}>
                     <MenuOption
@@ -211,7 +205,7 @@ export default function PerfilScreen() {
                 <View style={styles.menuContainer}>
                     <View style={styles.menuItem}>
                         <View style={styles.iconBox}>
-                            <FontAwesomeIcon icon={faBell} size={18} color="#3A88F6" />
+                            <FontAwesomeIcon icon={faBell} size={20} color="#3A88F6" />
                         </View>
                         <View style={styles.menuTextContainer}>
                             <Text style={styles.menuTitle}>Notificaciones</Text>
@@ -220,7 +214,7 @@ export default function PerfilScreen() {
                         <Switch
                             value={notificaciones}
                             onValueChange={setNotificaciones}
-                            trackColor={{ false: "#E0E0E0", true: "#3A88F6" }}
+                            trackColor={{ false: "#E5E7EB", true: "#3A88F6" }}
                             thumbColor={"#FFFFFF"}
                         />
                     </View>
@@ -234,7 +228,7 @@ export default function PerfilScreen() {
                 </View>
 
                 {/* 4. Botón Cerrar Sesión */}
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.8}>
                     {loadingLogout ? (
                         <ActivityIndicator color="#FE5F5F" />
                     ) : (
@@ -249,14 +243,18 @@ export default function PerfilScreen() {
 
             </ScrollView>
 
-            {/* ... TU MODAL DE PASSWORD IGUAL ... */}
+            {/* MODAL DE PASSWORD OPTIMIZADO */}
             <Modal
                 animationType="slide"
                 transparent={true}
                 visible={modalPasswordVisible}
                 onRequestClose={() => setModalPasswordVisible(false)}
             >
-                <View style={styles.modalOverlay}>
+                {/* KeyboardAvoidingView evita que el teclado de Android/iOS tape los inputs */}
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeaderBar} />
 
@@ -269,6 +267,7 @@ export default function PerfilScreen() {
                                 style={styles.input}
                                 secureTextEntry
                                 placeholder="********"
+                                placeholderTextColor="#9CA3AF"
                                 value={passActual}
                                 onChangeText={setPassActual}
                             />
@@ -280,6 +279,7 @@ export default function PerfilScreen() {
                                 style={styles.input}
                                 secureTextEntry
                                 placeholder="********"
+                                placeholderTextColor="#9CA3AF"
                                 value={passNueva}
                                 onChangeText={setPassNueva}
                             />
@@ -291,12 +291,13 @@ export default function PerfilScreen() {
                                 style={styles.input}
                                 secureTextEntry
                                 placeholder="********"
+                                placeholderTextColor="#9CA3AF"
                                 value={passConfirmar}
                                 onChangeText={setPassConfirmar}
                             />
                         </View>
 
-                        <TouchableOpacity style={styles.saveButton} onPress={guardarPassword}>
+                        <TouchableOpacity style={styles.saveButton} onPress={guardarPassword} activeOpacity={0.8}>
                             <Text style={styles.saveButtonText}>Actualizar Contraseña</Text>
                         </TouchableOpacity>
 
@@ -307,7 +308,7 @@ export default function PerfilScreen() {
                             <Text style={styles.cancelButtonText}>Cancelar</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </>
     );
@@ -322,79 +323,88 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         padding: 25,
-        marginBottom: 25,
-        elevation: 2,
+        marginBottom: 30,
+        elevation: 1,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
     },
     avatarContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 76,
+        height: 76,
+        borderRadius: 38,
         backgroundColor: '#3A88F6',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 15,
-        shadowColor: "#3A88F6",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
     },
-    userName: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 4 },
-    userRole: { fontSize: 14, color: '#999', marginBottom: 10 },
+    userName: { fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 10, textAlign: 'center' },
+    userRole: { fontSize: 13, color: '#6B7280', marginBottom: 10 },
     emailBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F5F5F5',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 15
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginTop: 5,
     },
-    userEmail: { fontSize: 12, color: '#666' },
+    userEmail: { fontSize: 13, color: '#4B5563', fontWeight: '500' },
 
-    sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#999', marginBottom: 10, marginLeft: 5 },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#9CA3AF',
+        marginBottom: 12,
+        marginLeft: 8,
+        marginTop: -10
+    },
     menuContainer: {
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
         paddingHorizontal: 5,
         marginBottom: 25,
         elevation: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 2,
     },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 15,
+        paddingVertical: 16,
         paddingHorizontal: 15,
     },
     iconBox: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: '#F0F8FF',
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 15,
     },
-    iconBoxDestructive: { backgroundColor: '#FFF0F0' },
+    iconBoxDestructive: { backgroundColor: '#FEF2F2' },
     menuTextContainer: { flex: 1 },
-    menuTitle: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 2 },
+    menuTitle: { fontSize: 15, fontWeight: '600', color: '#1F2937', marginBottom: 2 },
     menuTitleDestructive: { color: '#FE5F5F' },
-    menuSubtitle: { fontSize: 12, color: '#999' },
-    divider: { height: 1, backgroundColor: '#F5F5F5', marginLeft: 68 },
+    menuSubtitle: { fontSize: 13, color: '#9CA3AF' },
+    divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 70 },
 
     logoutButton: {
         flexDirection: 'row',
-        backgroundColor: '#FFF0F0',
+        backgroundColor: '#FEF2F2',
         borderRadius: 16,
         padding: 16,
         justifyContent: 'center',
         alignItems: 'center',
+        marginTop: 10,
         marginBottom: 20,
     },
     logoutText: { color: '#FE5F5F', fontWeight: 'bold', fontSize: 16 },
-    versionText: { textAlign: 'center', color: '#CCC', fontSize: 12, marginBottom: 30 },
+    versionText: { textAlign: 'center', color: '#D1D5DB', fontSize: 12, marginBottom: 30, fontWeight: '500' },
 
     modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
     modalContent: {
@@ -402,45 +412,40 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 25,
         borderTopRightRadius: 25,
         padding: 25,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'ios' ? 40 : 25,
     },
     modalHeaderBar: {
-        width: 40,
-        height: 4,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 2,
+        width: 45,
+        height: 5,
+        backgroundColor: '#D1D5DB',
+        borderRadius: 3,
         alignSelf: 'center',
         marginBottom: 20,
     },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 8, textAlign: 'center' },
-    modalSubtitle: { fontSize: 13, color: '#999', marginBottom: 25, textAlign: 'center', paddingHorizontal: 20 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 8, textAlign: 'center' },
+    modalSubtitle: { fontSize: 14, color: '#6B7280', marginBottom: 25, textAlign: 'center', paddingHorizontal: 10 },
 
-    inputContainer: { marginBottom: 15 },
-    inputLabel: { fontSize: 12, fontWeight: 'bold', color: '#555', marginBottom: 8 },
+    inputContainer: { marginBottom: 16 },
+    inputLabel: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
     input: {
-        backgroundColor: '#F9F9F9',
+        backgroundColor: '#F9FAFB',
         borderWidth: 1,
-        borderColor: '#EEE',
+        borderColor: '#E5E7EB',
         borderRadius: 12,
         paddingHorizontal: 15,
-        paddingVertical: 12,
+        paddingVertical: 14,
         fontSize: 16,
-        color: '#333',
+        color: '#111827',
     },
     saveButton: {
         backgroundColor: '#3A88F6',
         borderRadius: 12,
         padding: 16,
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: 15,
         marginBottom: 10,
-        shadowColor: "#3A88F6",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        elevation: 4,
     },
     saveButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
     cancelButton: { padding: 15, alignItems: 'center' },
-    cancelButtonText: { color: '#999', fontWeight: '600', fontSize: 15 },
-});
+    cancelButtonText: { color: '#6B7280', fontWeight: '600', fontSize: 15 },
+}); 0  
