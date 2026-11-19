@@ -235,9 +235,7 @@ export default function DashboardScreen() {
                                 <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faClipboardList as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={[styles.cardValue, styles.cardValueMoney]} numberOfLines={1} adjustsFontSizeToFit>
-                                    {formatoMoneda(resumen.pagoTotal)}
-                                </Text>
+                                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>{resumen.ordenesActivas}</Text>
                             </View>
                             <Text style={styles.cardLabel}>Órdenes en curso</Text>
                         </TouchableOpacity>
@@ -251,7 +249,7 @@ export default function DashboardScreen() {
                                 <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faWallet as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                                <Text style={[styles.cardValue, styles.cardValueMoney]} numberOfLines={1} adjustsFontSizeToFit>
                                     {formatoMoneda(resumen.pagoTotal)}
                                 </Text>
                             </View>
