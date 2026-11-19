@@ -22,19 +22,77 @@ interface OrdenCard {
     descripcionEstatus: string;
 }
 
+const OPCIONES_FILTRO = ["Todas", "En curso", "Listas", "Canceladas"];
+
+const formatearFechaEspanol = (fechaIso: string) => {
+    if (!fechaIso) return "Sin fecha";
+
+    const meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    const partes = fechaIso.split('-');
+    if (partes.length !== 3) return fechaIso;
+
+    const mesIndex = parseInt(partes[1], 10) - 1;
+    const dia = parseInt(partes[2], 10);
+
+    return `${meses[mesIndex]} ${dia}`;
+};
+
+const formatearFechaEntregaEspanol = (fechaString?: string) => {
+    if (!fechaString || fechaString === 'Por definir') return 'Por definir';
+
+    const mesesDiccionario: { [key: string]: string } = {
+        'Jan': 'Enero', 'Feb': 'Febrero', 'Mar': 'Marzo', 'Apr': 'Abril',
+        'May': 'Mayo', 'Jun': 'Junio', 'Jul': 'Julio', 'Aug': 'Agosto',
+        'Sep': 'Septiembre', 'Oct': 'Octubre', 'Nov': 'Noviembre', 'Dec': 'Diciembre'
+    };
+
+    const partes = fechaString.trim().split(/\s+/);
+
+    if (partes.length === 3) {
+        const dia = parseInt(partes[0], 10);
+        const mesIngles = partes[1];
+        const anio = partes[2];
+        const mesEspanol = mesesDiccionario[mesIngles] || mesIngles;
+        return `${dia} de ${mesEspanol} de ${anio}`;
+    }
+
+    return fechaString;
+};
+
+const getStatusColor = (clave: string) => {
+    if (!clave) return "#3A88F6";
+    if (clave.includes('ENTREGADA')) return "#7CCB64";
+    if (clave.includes('ATRASADA') || clave.includes('CANCELADA') || clave.includes('RECHAZADO')) return "#FE5F5F";
+    return "#3A88F6";
+};
+
+const formatoMoneda = (cantidad: any) => {
+    if (cantidad === null || cantidad === undefined) return "$0.00";
+    const numero = Number(cantidad);
+    if (isNaN(numero)) return "$0.00";
+    return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN'
+    }).format(numero);
+};
+
 export default function OrdenesScreen() {
     const router = useRouter();
 
     const [ordenes, setOrdenes] = useState<OrdenCard[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const [page, setPage] = useState(0);
     const [isLastPage, setIsLastPage] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
 
     const [filtroActivo, setFiltroActivo] = useState("Todas");
-    const opcionesFiltro = ["Todas", "En curso", "Listas", "Canceladas"];
     const [fechaSeleccionada, setFechaSeleccionada] = useState<Date | null>(null);
     const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
@@ -44,151 +102,124 @@ export default function OrdenesScreen() {
     const [modalDetalleVisible, setModalDetalleVisible] = useState(false);
     const [ordenSeleccionada, setOrdenSeleccionada] = useState<OrdenCard | null>(null);
 
-    const formatearFechaEspanol = (fechaIso: string) => {
-        if (!fechaIso) return "Sin fecha";
-
-        const meses = [
-            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-        ];
-
-        const partes = fechaIso.split('-');
-        if (partes.length !== 3) return fechaIso;
-
-        const mesIndex = parseInt(partes[1], 10) - 1;
-        const dia = parseInt(partes[2], 10);
-
-        return `${meses[mesIndex]} ${dia}`;
-    };
-
-    const formatearFechaEntregaEspanol = (fechaString?: string) => {
-        if (!fechaString || fechaString === 'Por definir') return 'Por definir';
-
-        const mesesDiccionario: { [key: string]: string } = {
-            'Jan': 'Enero', 'Feb': 'Febrero', 'Mar': 'Marzo', 'Apr': 'Abril',
-            'May': 'Mayo', 'Jun': 'Junio', 'Jul': 'Julio', 'Aug': 'Agosto',
-            'Sep': 'Septiembre', 'Oct': 'Octubre', 'Nov': 'Noviembre', 'Dec': 'Diciembre'
-        };
-
-        const partes = fechaString.trim().split(/\s+/);
-
-        if (partes.length === 3) {
-            const dia = parseInt(partes[0], 10);
-            const mesIngles = partes[1];
-            const anio = partes[2];
-
-            const mesEspanol = mesesDiccionario[mesIngles] || mesIngles;
-
-            return `${dia} de ${mesEspanol} de ${anio}`;
-        }
-
-        return fechaString;
-    };
-
+    // Debounce: el setState ocurre dentro del callback del timer
     useEffect(() => {
         const timer = setTimeout(() => {
-            setDebouncedBusqueda(busqueda);
+            if (busqueda.trim() !== debouncedBusqueda.trim()) {
+                setLoading(true);
+                setDebouncedBusqueda(busqueda);
+            }
         }, 500);
         return () => clearTimeout(timer);
-    }, [busqueda]);
+    }, [busqueda, debouncedBusqueda]);
 
-    const fetchOrdenes = async (pageNumber = 0) => {
-        if (pageNumber > 0 && (loadingMore || loading || isLastPage)) return;
+    // Solo pide datos; no toca estado
+    const pedirOrdenes = useCallback(async (pageNumber: number) => {
+        const queryParams = [
+            `page=${pageNumber}`,
+            `size=20`,
+            `estado=${encodeURIComponent(filtroActivo)}`,
+        ];
 
-        if (pageNumber === 0) {
-            setLoading(true);
-            setIsLastPage(false);
-            setPage(0);
-        } else {
-            setLoadingMore(true);
+        if (debouncedBusqueda.trim() !== '') {
+            queryParams.push(`busqueda=${encodeURIComponent(debouncedBusqueda.trim())}`);
+        }
+        if (fechaSeleccionada) {
+            const year = fechaSeleccionada.getFullYear();
+            const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
+            const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
+            queryParams.push(`fecha=${year}-${month}-${day}`);
         }
 
+        const data = await apiFetch(`/api/ordenes/movil/tarjetas?${queryParams.join('&')}`);
+        const esArreglo = Array.isArray(data);
+        const crudas: OrdenCard[] = esArreglo ? data : (data.content || []);
+
+        const filtradas = crudas.filter((o) => {
+            const clave = o.claveEstatus?.toUpperCase() || "";
+            return !clave.includes("COT_INICIADA");
+        });
+
+        const esUltima = esArreglo ? true : (data.last ?? (crudas.length < 20));
+        return { ordenes: filtradas, esUltima };
+    }, [filtroActivo, debouncedBusqueda, fechaSeleccionada]);
+
+    // Carga de la página 0: todo setState ocurre después del await
+    useEffect(() => {
+        let cancelled = false;
+
+        const cargar = async () => {
+            try {
+                const { ordenes: nuevas, esUltima } = await pedirOrdenes(0);
+                if (cancelled) return;
+                setOrdenes(nuevas);
+                setIsLastPage(esUltima);
+                setPage(0);
+            } catch (error) {
+                if (cancelled) return;
+                console.error("Error al obtener órdenes: ", error);
+                setOrdenes([]);
+                setIsLastPage(true);
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        };
+
+        cargar();
+        return () => { cancelled = true; };
+    }, [pedirOrdenes, refreshKey]);
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        setRefreshKey(k => k + 1);
+    };
+
+    const cargarMasOrdenes = async () => {
+        if (isLastPage || loadingMore || loading || refreshing) return;
+
+        setLoadingMore(true);
         try {
-            let queryParams = [
-                `page=${pageNumber}`,
-                `size=20`,
-                `estado=${encodeURIComponent(filtroActivo)}`,
-            ];
-
-            if (debouncedBusqueda.trim() !== '') {
-                queryParams.push(`busqueda=${encodeURIComponent(debouncedBusqueda.trim())}`);
-            }
-            if (fechaSeleccionada) {
-                const year = fechaSeleccionada.getFullYear();
-                const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
-                const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
-                queryParams.push(`fecha=${year}-${month}-${day}`);
-            }
-
-            const queryString = `?${queryParams.join('&')}`;
-            const endpoint = `/api/ordenes/movil/tarjetas${queryString}`;
-            const data = await apiFetch(endpoint);
-            const esArreglo = Array.isArray(data);
-            let nuevasOrdenes = esArreglo ? data : (data.content || []);
-
-            nuevasOrdenes = nuevasOrdenes.filter((o: OrdenCard) => {
-                const clave = o.claveEstatus?.toUpperCase() || "";
-                return !clave.includes("COT_INICIADA");
+            const siguiente = page + 1;
+            const { ordenes: nuevas, esUltima } = await pedirOrdenes(siguiente);
+            setOrdenes(prev => {
+                const ids = new Set(prev.map(o => o.idOrden));
+                return [...prev, ...nuevas.filter(o => !ids.has(o.idOrden))];
             });
-
-            const esUltima = esArreglo ? true : (data.last ?? (nuevasOrdenes.length < 20));
-
-            if (pageNumber === 0) {
-                setOrdenes(nuevasOrdenes);
-            } else {
-                setOrdenes(prev => {
-                    const idsExistentes = new Set(prev.map(o => o.idOrden));
-                    const filtradas = nuevasOrdenes.filter((o: OrdenCard) => !idsExistentes.has(o.idOrden));
-                    return [...prev, ...filtradas];
-                });
-            }
-
             setIsLastPage(esUltima);
-            setPage(pageNumber);
-
-        } catch (error: any) {
-            console.error("Error al obtener órdenes: ", error);
-            if (pageNumber === 0) setOrdenes([]);
+            setPage(siguiente);
+        } catch (error) {
+            console.error("Error al cargar más órdenes: ", error);
             setIsLastPage(true);
         } finally {
-            setLoading(false);
             setLoadingMore(false);
-            setRefreshing(false);
         }
     };
 
-    useEffect(() => {
-        fetchOrdenes(0);
-    }, [debouncedBusqueda, filtroActivo, fechaSeleccionada]);
-
-    const onRefresh = useCallback(() => {
-        setRefreshing(true);
-        fetchOrdenes(0);
-    }, [debouncedBusqueda, filtroActivo, fechaSeleccionada]);
-
-    const cargarMasOrdenes = () => {
-        if (!isLastPage && !loadingMore && !loading && !refreshing) {
-            fetchOrdenes(page + 1);
-        }
+    // Handlers: aquí se activa el loading
+    const cambiarFiltro = (opcion: string) => {
+        if (opcion === filtroActivo) return;
+        setLoading(true);
+        setFiltroActivo(opcion);
     };
 
-    const getStatusColor = (clave: string) => {
-        if (!clave) return "#3A88F6";
-        if (clave.includes('ENTREGADA')) return "#7CCB64";
-        if (clave.includes('ATRASADA') || clave.includes('CANCELADA') || clave.includes('RECHAZADO')) return "#FE5F5F";
-        return "#3A88F6";
-    }
+    const aplicarFecha = (fecha: Date | null) => {
+        setLoading(true);
+        setFechaSeleccionada(fecha);
+    };
 
     const onDateChange = (event: any, selectedDate?: Date) => {
         if (Platform.OS === 'android') {
             setMostrarCalendario(false);
             if (event.type === 'set' && selectedDate) {
-                setFechaSeleccionada(selectedDate);
+                aplicarFecha(selectedDate);
             }
             return;
         }
         if (selectedDate) {
-            setFechaSeleccionada(selectedDate);
+            aplicarFecha(selectedDate);
         }
     };
 
@@ -197,12 +228,12 @@ export default function OrdenesScreen() {
         if (dateValue) {
             const selectedDate = new Date(dateValue);
             selectedDate.setMinutes(selectedDate.getMinutes() + selectedDate.getTimezoneOffset());
-            setFechaSeleccionada(selectedDate);
+            aplicarFecha(selectedDate);
         }
     };
 
     const cerrarCalendario = () => setMostrarCalendario(false);
-    const limpiarFecha = () => setFechaSeleccionada(null);
+    const limpiarFecha = () => aplicarFecha(null);
 
     const abrirDetalle = (orden: OrdenCard) => {
         setOrdenSeleccionada(orden);
@@ -217,16 +248,6 @@ export default function OrdenesScreen() {
             console.log("Error al leer los productos", error);
             return [];
         }
-    };
-
-    const formatoMoneda = (cantidad: any) => {
-        if (cantidad === null || cantidad === undefined) return "$0.00";
-        const numero = Number(cantidad);
-        if (isNaN(numero)) return "$0.00";
-        return new Intl.NumberFormat('es-MX', {
-            style: 'currency',
-            currency: 'MXN'
-        }).format(numero);
     };
 
     const listaProductos = obtenerProductosDetalle();
@@ -288,13 +309,13 @@ export default function OrdenesScreen() {
 
             <View style={styles.headerExtension}>
                 <View style={styles.tabsBackground}>
-                    {opcionesFiltro.map((opcion) => {
+                    {OPCIONES_FILTRO.map((opcion) => {
                         const isActive = filtroActivo === opcion;
 
                         return (
                             <TouchableOpacity
                                 key={opcion}
-                                onPress={() => setFiltroActivo(opcion)}
+                                onPress={() => cambiarFiltro(opcion)}
                                 activeOpacity={0.8}
                                 style={[
                                     styles.tab,
@@ -352,7 +373,7 @@ export default function OrdenesScreen() {
                     </View>
                 )}
 
-                {loading && page === 0 ? (
+                {loading && !refreshing ? (
                     <ActivityIndicator size="large" color="#3A88F6" style={{ marginTop: 40 }} />
                 ) : (
                     <FlatList
@@ -368,12 +389,12 @@ export default function OrdenesScreen() {
                         onEndReached={cargarMasOrdenes}
                         onEndReachedThreshold={0.2}
 
-                        ListFooterComponent={() =>
+                        ListFooterComponent={
                             loadingMore ? (
                                 <View style={{ paddingVertical: 20, alignItems: 'center', justifyContent: 'center' }}>
                                     <ActivityIndicator size="small" color="#3A88F6" />
                                 </View>
-                            ) : null
+                            ) : undefined
                         }
 
                         ListEmptyComponent={
@@ -529,6 +550,8 @@ export default function OrdenesScreen() {
         </>
     );
 }
+
+// const styles = StyleSheet.create({ ... }) → déjalo exactamente igual que lo tienes
 
 const styles = StyleSheet.create({
     container: {

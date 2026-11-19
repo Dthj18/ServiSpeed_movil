@@ -16,7 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     ScrollView,
@@ -79,19 +79,10 @@ export default function TrackerScreen() {
     const { idOrden } = useLocalSearchParams();
 
     const [historial, setHistorial] = useState<MovimientoTracker[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(Boolean(idOrden));
 
-    useEffect(() => {
-        if (idOrden) {
-            getHistorial(Number(idOrden));
-        } else {
-            setLoading(false);
-        }
-    }, [idOrden]);
-
-    const getHistorial = async (id: number) => {
+    const getHistorial = useCallback(async (id: number) => {
         try {
-            setLoading(true);
             const data = await apiFetch(`/api/ordenes/${id}/historial`);
             setHistorial(data);
         } catch (error) {
@@ -100,7 +91,13 @@ export default function TrackerScreen() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (idOrden) {
+            getHistorial(Number(idOrden));
+        }
+    }, [idOrden, getHistorial]);
 
     return (
         <View style={styles.container}>
