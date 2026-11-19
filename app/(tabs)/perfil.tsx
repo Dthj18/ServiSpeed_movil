@@ -1,4 +1,5 @@
 import { apiFetch } from '@/services/apiClient';
+import { clearSession } from '@/services/session';
 import { faBell, faChevronRight, faCircleQuestion, faEnvelope, faLock, faRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -44,6 +45,14 @@ export default function PerfilScreen() {
     const [passNueva, setPassNueva] = useState('');
     const [passConfirmar, setPassConfirmar] = useState('');
 
+    const showAlert = (title: string, message: string) => {
+        if (Platform.OS === 'web') {
+            window.alert(`${title}: ${message}`);
+        } else {
+            Alert.alert(title, message);
+        }
+    };
+
     useFocusEffect(
         useCallback(() => {
             const obtenerDatosDePersona = async () => {
@@ -81,7 +90,26 @@ export default function PerfilScreen() {
         }, [])
     );
 
+    const ejecutarLogout = async () => {
+        setLoadingLogout(true);
+        await clearSession();
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userData');
+
+        setTimeout(() => {
+            setLoadingLogout(false);
+            router.replace('/login');
+        }, 500);
+    };
+
     const handleLogout = () => {
+        if (Platform.OS === 'web') {
+            if (window.confirm("¿Estás seguro que deseas cerrar sesión?")) {
+                ejecutarLogout();
+            }
+            return;
+        }
+
         Alert.alert(
             "Cerrar Sesión",
             "¿Estás seguro que deseas salir?",
@@ -90,16 +118,7 @@ export default function PerfilScreen() {
                 {
                     text: "Salir",
                     style: "destructive",
-                    onPress: async () => {
-                        setLoadingLogout(true);
-                        await AsyncStorage.removeItem('userToken');
-                        await AsyncStorage.removeItem('userData');
-
-                        setTimeout(() => {
-                            setLoadingLogout(false);
-                            router.replace('/login');
-                        }, 1000);
-                    }
+                    onPress: ejecutarLogout,
                 }
             ]
         );
@@ -107,18 +126,18 @@ export default function PerfilScreen() {
 
     const guardarPassword = async () => {
         if (!passActual || !passNueva || !passConfirmar) {
-            Alert.alert("Error", "Todos los campos son obligatorios");
+            showAlert("Error", "Todos los campos son obligatorios");
             return;
         }
         if (passNueva !== passConfirmar) {
-            Alert.alert("Error", "Las contraseñas nuevas no coinciden");
+            showAlert("Error", "Las contraseñas nuevas no coinciden");
             return;
         }
 
         try {
             const jsonUser = await AsyncStorage.getItem('userData');
             if (!jsonUser) {
-                Alert.alert("Error", "No se encontró sesión activa. Reingresa a la app.");
+                showAlert("Error", "No se encontró sesión activa. Reingresa a la app.");
                 return;
             }
 
@@ -132,7 +151,7 @@ export default function PerfilScreen() {
                 }
             });
 
-            Alert.alert("Éxito", "Tu contraseña ha sido actualizada correctamente");
+            showAlert("Éxito", "Tu contraseña ha sido actualizada correctamente");
             setModalPasswordVisible(false);
             setPassActual('');
             setPassNueva('');
@@ -142,9 +161,9 @@ export default function PerfilScreen() {
             const mensajeServidor = error.message || error.mensaje || error.data?.message || "";
 
             if (error.status === 400 || mensajeServidor.toLowerCase().includes("incorrecta")) {
-                Alert.alert("Contraseña Incorrecta", "La contraseña actual que ingresaste no es la correcta. Inténtalo de nuevo.");
+                showAlert("Contraseña Incorrecta", "La contraseña actual que ingresaste no es la correcta. Inténtalo de nuevo.");
             } else {
-                Alert.alert("Error", mensajeServidor || "No se pudo actualizar la contraseña. Revisa tu conexión.");
+                showAlert("Error", mensajeServidor || "No se pudo actualizar la contraseña. Revisa tu conexión.");
             }
         }
     };
@@ -159,7 +178,7 @@ export default function PerfilScreen() {
         const url = `mailto:${email}?subject=${subject}&body=${body}`;
 
         Linking.openURL(url).catch(() => {
-            Alert.alert(
+            showAlert(
                 "Error",
                 "No se pudo abrir ninguna aplicación de correo. Verifica que tengas una instalada."
             );
@@ -267,7 +286,6 @@ export default function PerfilScreen() {
                 visible={modalPasswordVisible}
                 onRequestClose={() => setModalPasswordVisible(false)}
             >
-                {/* KeyboardAvoidingView evita que el teclado de Android/iOS tape los inputs */}
                 <KeyboardAvoidingView
                     style={styles.modalOverlay}
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
