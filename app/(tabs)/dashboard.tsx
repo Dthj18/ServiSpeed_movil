@@ -235,7 +235,9 @@ export default function DashboardScreen() {
                                 <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faClipboardList as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>{resumen.ordenesActivas}</Text>
+                                <Text style={[styles.cardValue, styles.cardValueMoney]} numberOfLines={1} adjustsFontSizeToFit>
+                                    {formatoMoneda(resumen.pagoTotal)}
+                                </Text>
                             </View>
                             <Text style={styles.cardLabel}>Órdenes en curso</Text>
                         </TouchableOpacity>
@@ -383,6 +385,10 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         fontFamily: "LexendTera-ExtraBold",
     },
+    cardValueMoney: {
+        fontSize: 12,
+        letterSpacing: -0.5,
+    },
     cardLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '500' },
     financeCard: {
         backgroundColor: '#FFFFFF',
@@ -400,11 +406,11 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         marginBottom: 25,
     },
-    financeTitleContainer: { flex: 1, marginRight: 15 },
+    financeTitleContainer: { flex: 1, marginRight: 8 },
     sectionTitle: { color: '#6B7280', fontSize: 13, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase' },
-    totalAmount: { color: '#111827', fontSize: 16, fontWeight: '800', fontFamily: "LexendTera-ExtraBold" },
-    periodSelector: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 4 },
-    periodButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
+    totalAmount: { color: '#111827', fontSize: 12, fontWeight: '800', fontFamily: "LexendTera-ExtraBold" },
+    periodSelector: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 3 },
+    periodButton: { paddingVertical: 6, paddingHorizontal: 9, borderRadius: 6 },
     periodButtonActive: { backgroundColor: '#FFFFFF', shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
     periodText: { color: '#6B7280', fontSize: 12, fontWeight: '600' },
     periodTextActive: { color: '#111827' },
