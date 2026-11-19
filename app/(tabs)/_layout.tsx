@@ -1,12 +1,35 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 type IconColor = React.ComponentProps<typeof IconSymbol>['color'];
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const resolveTabColor = (color: unknown): IconColor =>
   (color ?? '#8E8E93') as IconColor;
+
+function TabIcon({
+  sfName,
+  webName,
+  color,
+  size = 24,
+}: {
+  sfName: React.ComponentProps<typeof IconSymbol>['name'];
+  webName: IoniconName;
+  color: unknown;
+  size?: number;
+}) {
+  const resolvedColor = resolveTabColor(color);
+
+  if (Platform.OS === 'web') {
+    return <Ionicons name={webName} size={size} color={String(resolvedColor)} />;
+  }
+
+  return <IconSymbol size={size} name={sfName} color={resolvedColor} />;
+}
 
 export default function TabLayout() {
   return (
@@ -21,7 +44,7 @@ export default function TabLayout() {
         options={{
           title: 'Inicio',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="square.grid.2x2.fill" color={resolveTabColor(color)} />
+            <TabIcon sfName="square.grid.2x2.fill" webName="grid" color={color} />
           ),
         }}
       />
@@ -32,7 +55,7 @@ export default function TabLayout() {
         options={{
           title: 'Cotizaciones',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="doc.text.fill" color={resolveTabColor(color)} />
+            <TabIcon sfName="doc.text.fill" webName="document-text" color={color} />
           ),
         }}
       />
@@ -43,7 +66,7 @@ export default function TabLayout() {
         options={{
           title: 'Órdenes',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="list.bullet.rectangle.fill" color={resolveTabColor(color)} />
+            <TabIcon sfName="list.bullet.rectangle.fill" webName="list" color={color} />
           ),
         }}
       />
@@ -54,7 +77,7 @@ export default function TabLayout() {
         options={{
           title: 'Estadísticas',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="chart.bar.fill" color={resolveTabColor(color)} />
+            <TabIcon sfName="chart.bar.fill" webName="bar-chart" color={color} />
           ),
         }}
       />
@@ -65,7 +88,7 @@ export default function TabLayout() {
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="person.fill" color={resolveTabColor(color)} />
+            <TabIcon sfName="person.fill" webName="person" color={color} />
           ),
         }}
       />
