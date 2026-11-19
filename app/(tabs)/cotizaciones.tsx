@@ -4,7 +4,7 @@ import { faCalendarDays, faChartPie, faListUl } from '@fortawesome/free-solid-sv
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Stack } from 'expo-router';
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Dimensions,
@@ -23,10 +23,80 @@ const screenWidth = Dimensions.get("window").width;
 
 type Periodo = 'dia' | 'semana' | 'mes' | 'anio';
 
+/* ---------- Helpers puros (fuera del componente) ---------- */
+
+const formatDateISO = (date: Date) => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getRangoFechas = (date: Date, tipo: Periodo) => {
+    const inicio = new Date(date);
+    const fin = new Date(date);
+    inicio.setHours(0, 0, 0, 0);
+    fin.setHours(23, 59, 59, 999);
+
+    if (tipo === 'semana') {
+        const diaSemana = inicio.getDay() || 7;
+        inicio.setDate(inicio.getDate() - diaSemana + 1);
+        fin.setDate(fin.getDate() + (7 - diaSemana));
+    } else if (tipo === 'mes') {
+        inicio.setDate(1);
+        fin.setMonth(fin.getMonth() + 1, 0);
+    } else if (tipo === 'anio') {
+        inicio.setMonth(0, 1);
+        fin.setMonth(11, 31);
+    }
+    return { inicio, fin };
+};
+
+const getColor = (categoria: string) => {
+    if (categoria === 'Aprobadas' || categoria === 'Completado') return '#7CCB64';
+    if (categoria === 'Canceladas') return '#FE5F5F';
+    return '#3A88F6';
+};
+
+const chartConfig = {
+    backgroundGradientFrom: "#ffffff",
+    backgroundGradientFromOpacity: 0,
+    backgroundGradientTo: "#ffffff",
+    backgroundGradientToOpacity: 0,
+    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    strokeWidth: 2,
+};
+
+/* ---------- Componente fuera del render ---------- */
+
+function FilterTab({
+    label,
+    value,
+    periodo,
+    onSelect,
+}: {
+    label: string;
+    value: Periodo;
+    periodo: Periodo;
+    onSelect: (p: Periodo) => void;
+}) {
+    const isActive = periodo === value;
+    return (
+        <TouchableOpacity
+            style={[styles.tab, isActive && styles.tabActive]}
+            onPress={() => onSelect(value)}
+            activeOpacity={0.8}
+        >
+            <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+        </TouchableOpacity>
+    );
+}
+
 export default function CotizacionesScreen() {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
     const [pieData, setPieData] = useState<any[]>([]);
     const [razonesData, setRazonesData] = useState<any[]>([]);
     const [totalMovimientos, setTotalMovimientos] = useState(0);
@@ -35,31 +105,101 @@ export default function CotizacionesScreen() {
     const [periodo, setPeriodo] = useState<Periodo>('dia');
     const [mostrarCalendario, setMostrarCalendario] = useState(false);
 
-    const formatDateISO = (date: Date) => {
-        const year = date.getFullYear();
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const day = date.getDate().toString().padStart(2, '0');
-        return `${year}-${month}-${day}`;
+    // Carga de datos: todo el setState ocurre después de un await
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchCotizaciones = async () => {
+            try {
+                const usuario = await getUsuario();
+                const idUsuario = usuario?.idUsuario;
+
+                if (cancelled) return;
+
+                if (!idUsuario) {
+                    console.log("No hay usuario en sesión");
+                    setPieData([]);
+                    setRazonesData([]);
+                    return;
+                }
+
+                const { inicio, fin } = getRangoFechas(fechaBase, periodo);
+                const endpoint =
+                    `/api/dashboard/movil/graficas?idUsuario=${idUsuario}` +
+                    `&fechaInicio=${formatDateISO(inicio)}&fechaFin=${formatDateISO(fin)}`;
+
+                const data = await apiFetch(endpoint);
+                if (cancelled) return;
+
+                let suma = 0;
+                const graficaPastel = (data.datosPastel || []).map((item: any) => {
+                    suma += item.cantidad;
+                    return {
+                        name: item.categoria,
+                        population: item.cantidad,
+                        color: getColor(item.categoria),
+                        legendFontColor: "#555",
+                        legendFontSize: 12
+                    };
+                });
+                setPieData(graficaPastel);
+                setTotalMovimientos(suma);
+
+                if (data.datosRadar && Array.isArray(data.datosRadar)) {
+                    const razones = data.datosRadar
+                        .map((item: any) => ({
+                            texto: item.etiqueta || "Sin motivo",
+                            cantidad: item.valor || 0
+                        }))
+                        .filter((r: any) => r.cantidad > 0);
+                    setRazonesData(razones);
+                } else {
+                    setRazonesData([]);
+                }
+            } catch (error) {
+                if (cancelled) return;
+                console.error(error);
+                setPieData([]);
+                setRazonesData([]);
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }
+        };
+
+        fetchCotizaciones();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [fechaBase, periodo, refreshKey]);
+
+    /* ---------- Handlers: aquí se activa el loading ---------- */
+
+    const cambiarPeriodo = (p: Periodo) => {
+        if (p === periodo) return;
+        setLoading(true);
+        setPeriodo(p);
     };
 
-    const getRangoFechas = (date: Date, tipo: any) => {
-        const inicio = new Date(date);
-        const fin = new Date(date);
-        inicio.setHours(0, 0, 0, 0);
-        fin.setHours(23, 59, 59, 999);
+    const irAHoy = () => {
+        setLoading(true);
+        setFechaBase(new Date());
+    };
 
-        if (tipo === 'semana') {
-            const diaSemana = inicio.getDay() || 7;
-            inicio.setDate(inicio.getDate() - diaSemana + 1);
-            fin.setDate(fin.getDate() + (7 - diaSemana));
-        } else if (tipo === 'mes') {
-            inicio.setDate(1);
-            fin.setMonth(fin.getMonth() + 1, 0);
-        } else if (tipo === 'anio') {
-            inicio.setMonth(0, 1);
-            fin.setMonth(11, 31);
+    const onRefresh = () => {
+        setRefreshing(true);
+        setRefreshKey(k => k + 1);
+    };
+
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') setMostrarCalendario(false);
+        if (event.type === 'set' && selectedDate) {
+            setLoading(true);
+            setFechaBase(selectedDate);
         }
-        return { inicio, fin };
     };
 
     const getTextoRango = () => {
@@ -70,110 +210,10 @@ export default function CotizacionesScreen() {
         if (periodo === 'dia') return inicio.toLocaleDateString('es-ES', { dateStyle: 'full' });
         if (periodo === 'semana') return `Semana: ${inicio.toLocaleDateString('es-ES', optsDia)} - ${fin.toLocaleDateString('es-ES', optsDia)}`;
         if (periodo === 'mes') return inicio.toLocaleDateString('es-ES', optsMes);
-        if (periodo === 'anio') return `Año ${inicio.getFullYear()}`;
-        return '';
+        return `Año ${inicio.getFullYear()}`;
     };
 
-    const getColor = (categoria: string) => {
-        if (categoria === 'Aprobadas' || categoria === 'Completado') return '#7CCB64';
-        if (categoria === 'Canceladas') return '#FE5F5F';
-        return '#3A88F6';
-    };
-
-    const fetchCotizaciones = async () => {
-        try {
-            const usuario = await getUsuario();
-            const idUsuario = usuario?.idUsuario;
-
-            if (!idUsuario) {
-                console.log("No hay usuario en sesión");
-                setPieData([]);
-                setRazonesData([]);
-                return;
-            }
-
-            const { inicio, fin } = getRangoFechas(fechaBase || new Date(), periodo);
-            let endpoint = `/api/dashboard/movil/graficas?idUsuario=${idUsuario}`;
-
-            if (fechaBase) {
-                endpoint += `&fechaInicio=${formatDateISO(inicio)}&fechaFin=${formatDateISO(fin)}`;
-            }
-
-            const data = await apiFetch(endpoint);
-
-            let suma = 0;
-            const graficaPastel = (data.datosPastel || []).map((item: any) => {
-                suma += item.cantidad;
-                return {
-                    name: item.categoria,
-                    population: item.cantidad,
-                    color: getColor(item.categoria),
-                    legendFontColor: "#555",
-                    legendFontSize: 12
-                };
-            });
-            setPieData(graficaPastel);
-            setTotalMovimientos(suma);
-
-            if (data.datosRadar && Array.isArray(data.datosRadar)) {
-                const razones = data.datosRadar.map((item: any) => ({
-                    texto: item.etiqueta || "Sin motivo",
-                    cantidad: item.valor || 0
-                })).filter((r: any) => r.cantidad > 0);
-                setRazonesData(razones);
-            } else {
-                setRazonesData([]);
-            }
-
-        } catch (error) {
-            console.error(error);
-            setPieData([]);
-            setRazonesData([]);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
-
-    useEffect(() => {
-        setLoading(true);
-        fetchCotizaciones();
-    }, [fechaBase, periodo]);
-
-    const onRefresh = () => {
-        setRefreshing(true);
-        fetchCotizaciones();
-    };
-
-    const onDateChange = (event: any, selectedDate?: Date) => {
-        if (Platform.OS === 'android') setMostrarCalendario(false);
-        if (event.type === 'set' && selectedDate) {
-            setFechaBase(selectedDate);
-        }
-    };
-
-
-    const FilterTab = ({ label, value }: { label: string, value: Periodo }) => {
-        const isActive = periodo === value;
-        return (
-            <TouchableOpacity
-                style={[styles.tab, isActive && styles.tabActive]}
-                onPress={() => setPeriodo(value)}
-                activeOpacity={0.8}
-            >
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
-            </TouchableOpacity>
-        );
-    };
-
-    const chartConfig = {
-        backgroundGradientFrom: "#ffffff",
-        backgroundGradientFromOpacity: 0,
-        backgroundGradientTo: "#ffffff",
-        backgroundGradientToOpacity: 0,
-        color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-        strokeWidth: 2,
-    };
+    const textoRango = getTextoRango();
 
     return (
         <View style={styles.mainContainer}>
@@ -193,20 +233,19 @@ export default function CotizacionesScreen() {
                 }}
             />
 
-
             <View style={styles.fixedHeader}>
                 <View style={styles.tabsBackground}>
-                    <FilterTab label="Día" value="dia" />
-                    <FilterTab label="Semana" value="semana" />
-                    <FilterTab label="Mes" value="mes" />
-                    <FilterTab label="Año" value="anio" />
+                    <FilterTab label="Día" value="dia" periodo={periodo} onSelect={cambiarPeriodo} />
+                    <FilterTab label="Semana" value="semana" periodo={periodo} onSelect={cambiarPeriodo} />
+                    <FilterTab label="Mes" value="mes" periodo={periodo} onSelect={cambiarPeriodo} />
+                    <FilterTab label="Año" value="anio" periodo={periodo} onSelect={cambiarPeriodo} />
                 </View>
 
                 <View style={styles.dateInfoContainer}>
                     <Text style={styles.dateInfoText}>
-                        {getTextoRango().charAt(0).toUpperCase() + getTextoRango().slice(1)}
+                        {textoRango.charAt(0).toUpperCase() + textoRango.slice(1)}
                     </Text>
-                    <TouchableOpacity onPress={() => setFechaBase(new Date())}>
+                    <TouchableOpacity onPress={irAHoy}>
                         <Text style={styles.resetButton}>Hoy</Text>
                     </TouchableOpacity>
                 </View>

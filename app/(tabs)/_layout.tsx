@@ -13,9 +13,9 @@ export default function TabLayout() {
         headerShown: false,
       }}>
 
-      {/* 1. Pestaña INICIO (antes era el 'index' default) */}
+      {/* 1. Pestaña INICIO*/}
       <Tabs.Screen
-        name="dashboard" // <-- Debes crear el archivo dashboard.tsx
+        name="dashboard" 
         options={{
           title: 'Inicio',
           tabBarIcon: ({ color }) => (
@@ -24,7 +24,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 2. Pestaña COTIZACIONES (la que ya tenías) */}
+      {/* 2. Pestaña COTIZACIONES */}
       <Tabs.Screen
         name="cotizaciones"
         options={{
@@ -35,7 +35,7 @@ export default function TabLayout() {
       
       {/* 3. Pestaña ORDENES */}
       <Tabs.Screen
-        name="ordenes" // <-- Debes crear el archivo ordenes.tsx
+        name="ordenes"
         options={{
           title: 'Órdenes',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet.rectangle.fill" color={color} />,
@@ -44,7 +44,7 @@ export default function TabLayout() {
       
       {/* 4. Pestaña ESTADÍSTICAS */}
       <Tabs.Screen
-        name="estadisticas" // <-- Debes crear el archivo estadisticas.tsx
+        name="estadisticas" 
         options={{
           title: 'Estadísticas',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
@@ -53,7 +53,7 @@ export default function TabLayout() {
       
       {/* 5. Pestaña PERFIL */}
       <Tabs.Screen
-        name="perfil" // <-- Debes crear el archivo perfil.tsx
+        name="perfil" 
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
