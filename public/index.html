@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>ServiSpeed</title>
+
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1E3A8A" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ServiSpeed" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <style>
+        html,
+        body,
+        #root {
+            touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
+            overscroll-behavior: none;
+        }
+
+        /* Evita el zoom automático de iOS al tocar cualquier input */
+        input,
+        textarea,
+        select {
+            font-size: 16px !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script>
+        // Bloquea el zoom con dos dedos (pinch-to-zoom) en iOS Safari
+        document.addEventListener('gesturestart', function (e) {
+            e.preventDefault();
+        });
+    </script>
+</body>
+
+</html>
