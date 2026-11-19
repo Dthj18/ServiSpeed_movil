@@ -31,6 +31,18 @@ interface FinanzasDTO {
     datosGrafica: PuntoGrafica[];
 }
 
+const BotonFiltro = ({ texto, activo, onPress }: { texto: string; activo: boolean; onPress: () => void }) => (
+    <TouchableOpacity
+        style={[styles.periodButton, activo && styles.periodButtonActive]}
+        onPress={onPress}
+        activeOpacity={0.7}
+    >
+        <Text style={[styles.periodText, activo && styles.periodTextActive]}>
+            {texto}
+        </Text>
+    </TouchableOpacity>
+);
+
 export default function DashboardScreen() {
 
     const [filtroTiempo, setFiltroTiempo] = useState('Semana');
@@ -50,7 +62,7 @@ export default function DashboardScreen() {
         datosGrafica: []
     });
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = useCallback(async () => {
         try {
             const data = await apiFetch('/api/dashboard/resumen');
             setResumen(data);
@@ -60,9 +72,9 @@ export default function DashboardScreen() {
                 setError(true);
             }
         }
-    };
+    }, []);
 
-    const fetchFinanzas = async () => {
+    const fetchFinanzas = useCallback(async () => {
         try {
             const data = await apiFetch(`/api/dashboard/finanzas/grafica-app?filtro=${filtroTiempo.toLowerCase()}`);
             setFinanzas(data);
@@ -72,12 +84,12 @@ export default function DashboardScreen() {
                 setError(true);
             }
         }
-    };
+    }, [filtroTiempo]);
 
     const cargarTodo = useCallback(() => {
         setError(false);
         Promise.all([fetchDashboardData(), fetchFinanzas()]).finally(() => setLoading(false));
-    }, [filtroTiempo]);
+    }, [fetchDashboardData, fetchFinanzas]);
 
     useFocusEffect(
         useCallback(() => {
@@ -88,12 +100,9 @@ export default function DashboardScreen() {
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         setError(false);
-
-        // CORRECCIÓN APLICADA AQUÍ:
         await Promise.all([fetchDashboardData(), fetchFinanzas()]);
-
         setRefreshing(false);
-    }, [filtroTiempo]);
+    }, [fetchDashboardData, fetchFinanzas]);
 
     const formatoMoneda = (cantidad: any) => {
         if (cantidad === null || cantidad === undefined) return "$0.00";
@@ -143,18 +152,6 @@ export default function DashboardScreen() {
 
         return max === 0 ? 100 : max * 1.40;
     }, [finanzas.datosGrafica]);
-
-    const BotonFiltro = ({ texto }: { texto: string }) => (
-        <TouchableOpacity
-            style={[styles.periodButton, filtroTiempo === texto && styles.periodButtonActive]}
-            onPress={() => setFiltroTiempo(texto)}
-            activeOpacity={0.7}
-        >
-            <Text style={[styles.periodText, filtroTiempo === texto && styles.periodTextActive]}>
-                {texto}
-            </Text>
-        </TouchableOpacity>
-    );
 
     if (loading) {
         return (
@@ -279,9 +276,9 @@ export default function DashboardScreen() {
                             </View>
 
                             <View style={styles.periodSelector}>
-                                <BotonFiltro texto="Hoy" />
-                                <BotonFiltro texto="Semana" />
-                                <BotonFiltro texto="Mes" />
+                                <BotonFiltro texto="Hoy" activo={filtroTiempo === 'Hoy'} onPress={() => setFiltroTiempo('Hoy')} />
+                                <BotonFiltro texto="Semana" activo={filtroTiempo === 'Semana'} onPress={() => setFiltroTiempo('Semana')} />
+                                <BotonFiltro texto="Mes" activo={filtroTiempo === 'Mes'} onPress={() => setFiltroTiempo('Mes')} />
                             </View>
                         </View>
 

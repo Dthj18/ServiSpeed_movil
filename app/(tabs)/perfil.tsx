@@ -14,6 +14,19 @@ import {
     Switch, Text, TextInput, TouchableOpacity, View
 } from "react-native";
 
+const MenuOption = ({ icon, title, subtitle, onPress, showChevron = true, isDestructive = false }: any) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
+        <View style={[styles.iconBox, isDestructive && styles.iconBoxDestructive]}>
+            <FontAwesomeIcon icon={icon} size={20} color={isDestructive ? "#FE5F5F" : "#3A88F6"} />
+        </View>
+        <View style={styles.menuTextContainer}>
+            <Text style={[styles.menuTitle, isDestructive && styles.menuTitleDestructive]}>{title}</Text>
+            {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+        </View>
+        {showChevron && <FontAwesomeIcon icon={faChevronRight} size={14} color="#CCC" />}
+    </TouchableOpacity>
+);
+
 export default function PerfilScreen() {
     const router = useRouter();
 
@@ -135,19 +148,6 @@ export default function PerfilScreen() {
             }
         }
     };
-
-    const MenuOption = ({ icon, title, subtitle, onPress, showChevron = true, isDestructive = false }: any) => (
-        <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-            <View style={[styles.iconBox, isDestructive && styles.iconBoxDestructive]}>
-                <FontAwesomeIcon icon={icon} size={20} color={isDestructive ? "#FE5F5F" : "#3A88F6"} />
-            </View>
-            <View style={styles.menuTextContainer}>
-                <Text style={[styles.menuTitle, isDestructive && styles.menuTitleDestructive]}>{title}</Text>
-                {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
-            </View>
-            {showChevron && <FontAwesomeIcon icon={faChevronRight} size={14} color="#CCC" />}
-        </TouchableOpacity>
-    );
 
     const contactarSoporte = () => {
         const email = "diegothj57@gmail.com";
@@ -465,4 +465,4 @@ const styles = StyleSheet.create({
     saveButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
     cancelButton: { padding: 15, alignItems: 'center' },
     cancelButtonText: { color: '#6B7280', fontWeight: '600', fontSize: 15 },
-}); 0  
+}); 
