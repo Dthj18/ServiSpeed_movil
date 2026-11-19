@@ -9,6 +9,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest",
+    "test:unit": "jest __tests__/unit",
+    "test:integration": "jest __tests__/integration",
     "test:coverage": "jest --coverage",
     "lint": "expo lint"
   },
@@ -23,7 +25,7 @@
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
-    "expo": "~58.0.26",
+    "expo": "^58.0.26",
     "expo-asset": "~58.0.21",
     "expo-build-properties": "~58.0.12",
     "expo-constants": "~58.0.16",
@@ -77,6 +79,11 @@
     ],
     "setupFilesAfterEnv": [
       "@testing-library/jest-native/extend-expect"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/__tests__/",
+      "app/ventas-por-periodo.tsx"
     ]
   }
 }

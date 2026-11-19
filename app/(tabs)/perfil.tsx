@@ -465,4 +465,4 @@ const styles = StyleSheet.create({
     saveButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
     cancelButton: { padding: 15, alignItems: 'center' },
     cancelButtonText: { color: '#6B7280', fontWeight: '600', fontSize: 15 },
-}); 
+});
