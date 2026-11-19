@@ -2,12 +2,12 @@ import { apiFetch } from '@/services/apiClient';
 import { faBell, faChevronRight, faCircleQuestion, faEnvelope, faLock, faRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
     ActivityIndicator, Alert,
     KeyboardAvoidingView,
+    Linking,
     Modal,
     Platform,
     ScrollView, StyleSheet,
@@ -149,6 +149,23 @@ export default function PerfilScreen() {
         </TouchableOpacity>
     );
 
+    const contactarSoporte = () => {
+        const email = "diegothj57@gmail.com";
+        const subject = encodeURIComponent("Soporte App ServiSpeed");
+        const body = encodeURIComponent(
+            `Hola, necesito ayuda con la aplicación.\n\nMis datos:\nNombre: ${userData.nombre}\nRol: ${userData.rol}\n\nEscribe tu problema aquí: `
+        );
+
+        const url = `mailto:${email}?subject=${subject}&body=${body}`;
+
+        Linking.openURL(url).catch(() => {
+            Alert.alert(
+                "Error",
+                "No se pudo abrir ninguna aplicación de correo. Verifica que tengas una instalada."
+            );
+        });
+    };
+
     return (
         <>
             <Stack.Screen
@@ -223,7 +240,7 @@ export default function PerfilScreen() {
                         icon={faCircleQuestion}
                         title="Ayuda y Soporte"
                         subtitle="Contactar a sistemas"
-                        onPress={() => { }}
+                        onPress={contactarSoporte}
                     />
                 </View>
 

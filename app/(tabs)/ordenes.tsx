@@ -104,32 +104,33 @@ export default function OrdenesScreen() {
         }
 
         try {
-            let queryParams = [`page=${pageNumber}`, `size=20`];
+            let queryParams = [
+                `page=${pageNumber}`,
+                `size=20`,
+                `estado=${encodeURIComponent(filtroActivo)}`,
+            ];
 
             if (debouncedBusqueda.trim() !== '') {
                 queryParams.push(`busqueda=${encodeURIComponent(debouncedBusqueda.trim())}`);
-            }
-            if (filtroActivo !== "Todas") {
-                queryParams.push(`estado=${encodeURIComponent(filtroActivo)}`);
             }
             if (fechaSeleccionada) {
                 const year = fechaSeleccionada.getFullYear();
                 const month = (fechaSeleccionada.getMonth() + 1).toString().padStart(2, '0');
                 const day = fechaSeleccionada.getDate().toString().padStart(2, '0');
                 queryParams.push(`fecha=${year}-${month}-${day}`);
-            } else if (debouncedBusqueda.trim() === '') {
-                const hoy = new Date();
-                const year = hoy.getFullYear();
-                const month = (hoy.getMonth() + 1).toString().padStart(2, '0');
-
-                queryParams.push(`fecha=${year}-${month}`);
             }
 
             const queryString = `?${queryParams.join('&')}`;
             const endpoint = `/api/ordenes/movil/tarjetas${queryString}`;
             const data = await apiFetch(endpoint);
             const esArreglo = Array.isArray(data);
-            const nuevasOrdenes = esArreglo ? data : (data.content || []);
+            let nuevasOrdenes = esArreglo ? data : (data.content || []);
+
+            nuevasOrdenes = nuevasOrdenes.filter((o: OrdenCard) => {
+                const clave = o.claveEstatus?.toUpperCase() || "";
+                return !clave.includes("COT_INICIADA");
+            });
+
             const esUltima = esArreglo ? true : (data.last ?? (nuevasOrdenes.length < 20));
 
             if (pageNumber === 0) {
@@ -367,7 +368,7 @@ export default function OrdenesScreen() {
                         onEndReached={cargarMasOrdenes}
                         onEndReachedThreshold={0.2}
 
-                        ListFooterComponent={
+                        ListFooterComponent={() =>
                             loadingMore ? (
                                 <View style={{ paddingVertical: 20, alignItems: 'center', justifyContent: 'center' }}>
                                     <ActivityIndicator size="small" color="#3A88F6" />
