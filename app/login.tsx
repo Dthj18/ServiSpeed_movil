@@ -3,7 +3,7 @@ import { saveSession } from '@/services/session';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -29,7 +29,7 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const gradientHeight = useRef(new Animated.Value(GRADIENT_HEIGHT_EXPANDED)).current;
+    const [gradientHeight] = useState(() => new Animated.Value(GRADIENT_HEIGHT_EXPANDED));
 
     useEffect(() => {
         const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -55,7 +55,7 @@ export default function LoginScreen() {
             showSub.remove();
             hideSub.remove();
         };
-    }, []);
+    }, [gradientHeight]);
 
     const handleLogin = async () => {
         Keyboard.dismiss();

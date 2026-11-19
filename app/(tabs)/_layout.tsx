@@ -2,24 +2,26 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+
+type IconColor = React.ComponentProps<typeof IconSymbol>['color'];
+
+const resolveTabColor = (color: unknown): IconColor =>
+  (color ?? '#8E8E93') as IconColor;
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
       }}>
 
-      {/* 1. Pestaña INICIO*/}
+      {/* 1. Pestaña INICIO */}
       <Tabs.Screen
-        name="dashboard" 
+        name="dashboard"
         options={{
           title: 'Inicio',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="square.grid.2x2.fill" color={color} />
+            <IconSymbol size={28} name="square.grid.2x2.fill" color={resolveTabColor(color)} />
           ),
         }}
       />
@@ -29,34 +31,42 @@ export default function TabLayout() {
         name="cotizaciones"
         options={{
           title: 'Cotizaciones',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="doc.text.fill" color={resolveTabColor(color)} />
+          ),
         }}
       />
-      
+
       {/* 3. Pestaña ORDENES */}
       <Tabs.Screen
         name="ordenes"
         options={{
           title: 'Órdenes',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet.rectangle.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="list.bullet.rectangle.fill" color={resolveTabColor(color)} />
+          ),
         }}
       />
-      
+
       {/* 4. Pestaña ESTADÍSTICAS */}
       <Tabs.Screen
-        name="estadisticas" 
+        name="estadisticas"
         options={{
           title: 'Estadísticas',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="chart.bar.fill" color={resolveTabColor(color)} />
+          ),
         }}
       />
-      
+
       {/* 5. Pestaña PERFIL */}
       <Tabs.Screen
-        name="perfil" 
+        name="perfil"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="person.fill" color={resolveTabColor(color)} />
+          ),
         }}
       />
 
