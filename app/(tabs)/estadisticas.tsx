@@ -1,21 +1,156 @@
-import { faBook, faBullhorn, faCalendarDays, faMugHot, faShirt } from '@fortawesome/free-solid-svg-icons';
+import { apiFetch } from '@/services/apiClient';
+import { faBook, faBox, faBullhorn, faMugHot, faShirt, faTrophy } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { router, Stack } from 'expo-router';
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { LineChart } from "react-native-gifted-charts";
+import { Stack, useFocusEffect } from 'expo-router';
+import { ReactNode, useCallback, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+
+type Variant = 'light' | 'dark';
+
+type Row = {
+    key: string;
+    label: string;
+    value: string;
+    leading: ReactNode;
+};
+
+const ACCENT = "#0F766E";
+
+const formatMoney = (n: any) =>
+    Number(n || 0).toLocaleString('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        maximumFractionDigits: 0,
+    });
+
+function RankCard({
+    title,
+    variant,
+    loading,
+    emptyText,
+    rows,
+}: {
+    title: string;
+    variant: Variant;
+    loading: boolean;
+    emptyText: string;
+    rows: Row[];
+}) {
+    const dark = variant === 'dark';
+
+    return (
+        <View style={[styles.card, dark ? styles.cardDark : styles.cardLight]}>
+            <Text style={[styles.cardTitle, dark && { color: '#FFFFFF' }]}>{title}</Text>
+
+            {loading ? (
+                <ActivityIndicator
+                    size="small"
+                    color={dark ? '#FFFFFF' : ACCENT}
+                    style={{ marginVertical: 20 }}
+                />
+            ) : rows.length > 0 ? (
+                rows.map((row, index) => (
+                    <View
+                        key={row.key}
+                        style={[
+                            styles.row,
+                            index < rows.length - 1 && styles.rowDivider,
+                            index < rows.length - 1 && {
+                                borderBottomColor: dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+                            },
+                        ]}
+                    >
+                        {row.leading}
+                        <Text
+                            style={[styles.label, dark && { color: '#FFFFFF' }]}
+                            numberOfLines={2}
+                        >
+                            {row.label}
+                        </Text>
+                        <Text
+                            style={[styles.value, dark && { color: '#FFFFFF' }]}
+                            numberOfLines={1}
+                        >
+                            {row.value}
+                        </Text>
+                    </View>
+                ))
+            ) : (
+                <Text style={[styles.emptyText, dark && { color: '#E1BEE7' }]}>{emptyText}</Text>
+            )}
+        </View>
+    );
+}
 
 export default function EstadisticasScreen() {
+    const [topProductos, setTopProductos] = useState<any[]>([]);
+    const [topClientes, setTopClientes] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const lineDataSmall = [
-        { value: 0 },
-        { value: 20 },
-        { value: 10 },
-        { value: 28 },
-        { value: 22 },
-        { value: 12 },
-        { value: 22 }
-    ];
+    useFocusEffect(
+        useCallback(() => {
+            const cargarDatosDashboard = async () => {
+                // allSettled: si falla un endpoint, el otro igual se muestra
+                const [productos, clientes] = await Promise.allSettled([
+                    apiFetch('/api/dashboard/top-productos'),
+                    apiFetch('/api/dashboard/top-clientes'),
+                ]);
+
+                if (productos.status === 'fulfilled') setTopProductos(productos.value ?? []);
+                else console.error("Error al cargar top productos", productos.reason);
+
+                if (clientes.status === 'fulfilled') setTopClientes(clientes.value ?? []);
+                else console.error("Error al cargar top clientes", clientes.reason);
+
+                setLoading(false);
+            };
+            cargarDatosDashboard();
+        }, [])
+    );
+
+    const getIconoProducto = (descripcion: string) => {
+        if (!descripcion) return faBox;
+        const desc = descripcion.toLowerCase();
+        if (desc.includes('playera') || desc.includes('camis')) return faShirt;
+        if (desc.includes('taza') || desc.includes('termo')) return faMugHot;
+        if (desc.includes('lib') || desc.includes('cuaderno')) return faBook;
+        if (desc.includes('lona') || desc.includes('publi') || desc.includes('vinil')) return faBullhorn;
+        return faBox;
+    };
+
+    const getColorProducto = (index: number) => {
+        const colores = ["#FF5252", "#FF4081", "#448AFF", "#D32F2F"];
+        return colores[index % colores.length];
+    };
+
+    const getColorTrofeo = (index: number) =>
+        index === 0 ? "#FFD700" : index === 1 ? "#E0E0E0" : index === 2 ? "#CD7F32" : "#E1BEE7";
+
+    const filasProductos: Row[] = topProductos.map((prod, index) => ({
+        key: `prod-${index}`,
+        label: prod.descripcion,
+        value: Number(prod.cantidad).toLocaleString('es-MX'),
+        leading: (
+            <View style={[styles.iconBox, { backgroundColor: getColorProducto(index) + '1A' }]}>
+                <FontAwesomeIcon
+                    icon={getIconoProducto(prod.descripcion)}
+                    size={16}
+                    color={getColorProducto(index)}
+                />
+            </View>
+        ),
+    }));
+
+    const filasClientes: Row[] = topClientes.slice(0, 3).map((cliente, index) => ({
+        key: `cliente-${index}`,
+        label: cliente.nombre,
+        value: cliente.totalCompras,
+        leading: (
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                <FontAwesomeIcon icon={faTrophy} size={16} color={getColorTrofeo(index)} />
+            </View>
+        ),
+    }));
 
     return (
         <>
@@ -27,128 +162,34 @@ export default function EstadisticasScreen() {
                     headerTitleStyle: { fontFamily: "LexendTera-SemiBold", fontSize: 15 },
                     headerStyle: { backgroundColor: '#FFFFFF' },
                     headerShadowVisible: false,
-                    headerRight: () => (
-                        <TouchableOpacity onPress={() => { }} style={{ marginRight: 20 }}>
-                            <FontAwesomeIcon icon={faCalendarDays} size={20} color="#525252" />
-                        </TouchableOpacity>
-                    ),
                 }}
             />
 
             <ScrollView
-                contentContainerStyle={styles.scrollContainer}>
-                <Text style={styles.pageTitle}>{"Reportes y Estadísticas"}</Text>
-                <View style={styles.pinkCard}>
-                    <Text style={styles.cardTitle}>{"Productos más solicitados"}</Text>
+                contentContainerStyle={styles.scrollContainer}
+                showsVerticalScrollIndicator={false}
+            >
+                <RankCard
+                    title="Productos más solicitados"
+                    variant="light"
+                    loading={loading}
+                    emptyText="Aún no hay ventas registradas"
+                    rows={filasProductos}
+                />
 
-                    {/* Fila 1 */}
-                    <View style={styles.statRow}>
-                        <View style={styles.iconContainer}>
-                            <FontAwesomeIcon icon={faShirt} size={18} color="#FF5252" />
-                        </View>
-                        <Text style={styles.statLabel}>{"Playeras personalizadas"}</Text>
-                        <View style={styles.spacer} />
-                        <Text style={styles.statValue}>{"345"}</Text>
-                    </View>
-
-                    {/* Fila 2 */}
-                    <View style={styles.statRow}>
-                        <View style={styles.iconContainer}>
-                            <FontAwesomeIcon icon={faMugHot} size={18} color="#FF4081" />
-                        </View>
-                        <Text style={styles.statLabel}>{"Tazas personalizadas"}</Text>
-                        <View style={styles.spacer} />
-                        <Text style={styles.statValue}>{"290"}</Text>
-                    </View>
-
-                    {/* Fila 3 */}
-                    <View style={styles.statRow}>
-                        <View style={styles.iconContainer}>
-                            <FontAwesomeIcon icon={faBullhorn} size={18} color="#448AFF" />
-                        </View>
-                        <Text style={styles.statLabel}>{"Publicidad impresa"}</Text>
-                        <View style={styles.spacer} />
-                        <Text style={styles.statValue}>{"150"}</Text>
-                    </View>
-
-                    {/* Fila 4 */}
-                    <View style={styles.statRow}>
-                        <View style={styles.iconContainer}>
-                            <FontAwesomeIcon icon={faBook} size={18} color="#D32F2F" />
-                        </View>
-                        <Text style={styles.statLabel}>{"Libros"}</Text>
-                        <View style={styles.spacer} />
-                        <Text style={styles.statValue}>{"100"}</Text>
-                    </View>
-                </View>
-
-                {/* --- SECCIÓN 2: VENTAS (Tarjeta Azul con Gráfica) --- */}
-                {/* ¡AQUÍ ESTÁ LA MAGIA! Al presionar, vamos a /ventas-por-periodo */}
-                <TouchableOpacity
-                    style={styles.blueCard}
-                    onPress={() => router.push('/ventas-por-periodo')}
-                    activeOpacity={0.9}
-                >
-                    <Text style={styles.cardTitle}>{"Ventas por periodo"}</Text>
-                    <View style={{ alignItems: 'center', marginTop: 10 }}>
-                        <LineChart
-                            data={lineDataSmall}
-                            color="#2962FF"
-                            thickness={3}
-                            hideDataPoints={false}
-                            noOfSections={3}
-                            yAxisColor="transparent"
-                            xAxisColor="gray"
-                            rulesType="solid"
-                            rulesColor="rgba(0,0,0,0.1)"
-                            height={100}
-                            width={260} // Ajustado para que quepa en la tarjeta
-                            pointerConfig={{
-                                pointerStripHeight: 100,
-                                pointerStripColor: 'lightgray',
-                                pointerStripWidth: 2,
-                                pointerColor: 'lightgray',
-                                radius: 4,
-                                pointerLabelWidth: 100,
-                                pointerLabelHeight: 120,
-                                activatePointersOnLongPress: true,
-                                autoAdjustPointerLabelPosition: false,
-                            }}
-                        />
-                    </View>
-                </TouchableOpacity>
-
-                {/* --- SECCIÓN 3: MÉTRICAS (Tarjetas Amarillas) --- */}
-                <Text style={[styles.cardTitle, { marginTop: 10, marginBottom: 10, color: '#000', textAlign: 'left', marginLeft: 4 }]}>
-                    {"Métricas de productividad"}
-                </Text>
-
-                <View style={styles.metricsRow}>
-                    {/* Tarjeta Izquierda */}
-                    <View style={styles.yellowCard}>
-                        <Text style={styles.metricValue}>{"$3500.00"}</Text>
-                        <Text style={styles.metricLabel}>{"Ventas del día"}</Text>
-                    </View>
-
-                    <View style={{ width: 15 }} />
-
-                    {/* Tarjeta Derecha */}
-                    <View style={styles.yellowCard}>
-                        <Text style={styles.metricValue}>{"$250.00"}</Text>
-                        <Text style={styles.metricLabel}>{"Promedio de compra"}</Text>
-                    </View>
-                </View>
-
+                <RankCard
+                    title="Mejores clientes"
+                    variant="dark"
+                    loading={loading}
+                    emptyText="Aún no hay clientes con órdenes finalizadas"
+                    rows={filasClientes}
+                />
             </ScrollView>
         </>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
     scrollContainer: {
         flexGrow: 1,
         paddingTop: 20,
@@ -162,86 +203,68 @@ const styles = StyleSheet.create({
         marginBottom: 14,
         marginLeft: 4,
     },
-    // --- TARJETA ROSA (Productos) ---
-    pinkCard: {
-        backgroundColor: "#fffefeff", // Rosa sólido del mockup
+    card: {
         borderRadius: 21,
-        paddingVertical: 20,
-        paddingHorizontal: 20,
+        paddingVertical: 18,
+        paddingHorizontal: 16,
         marginBottom: 20,
-    },
-    // --- TARJETA AZUL (Gráfica) ---
-    blueCard: {
-        backgroundColor: "#ffffffff", // Azul sólido del mockup
-        borderRadius: 21,
-        paddingVertical: 15,
-        paddingHorizontal: 10, // Menos padding horizontal para que quepa la gráfica
-        marginBottom: 20,
-        minHeight: 200,
-        // Sombra sutil para indicar que es botón
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
         elevation: 2,
     },
+    cardLight: {
+        backgroundColor: "#FFFFFF",
+    },
+    cardDark: {
+        backgroundColor: ACCENT,
+    },
     cardTitle: {
         fontSize: 11,
         fontWeight: "bold",
         fontFamily: "LexendTera-SemiBold",
         color: "#000000",
-        marginBottom: 15,
+        marginBottom: 10,
         textAlign: 'center',
     },
-    // --- FILAS DE PRODUCTOS ---
-    statRow: {
+    row: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 12,
+        paddingVertical: 10,
     },
-    iconContainer: {
-        width: 24,
-        alignItems: 'center',
-        marginRight: 8,
+    rowDivider: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    statLabel: {
-        fontSize: 11,
-        color: "#000000",
-        fontWeight: "500",
-    },
-    spacer: {
-        flex: 1,
-    },
-    statValue: {
-        fontSize: 11,
-        fontWeight: "bold",
-        color: "#000000",
-    },
-    // --- MÉTRICAS INFERIORES (Amarillas) ---
-    metricsRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-    },
-    yellowCard: {
-        flex: 1, // Ocupa el 50% del espacio disponible
-        backgroundColor: "#ffffffff", // Amarillo pálido del mockup
-        borderRadius: 21,
-        paddingVertical: 25,
+    iconBox: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
+        marginRight: 12,
     },
-    metricValue: {
-        fontSize: 18,
-        fontWeight: "bold",
-        fontFamily: "LexendTera-SemiBold",
+    label: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: 12,
+        lineHeight: 16,
         color: "#000000",
-        marginBottom: 5,
+        fontWeight: "500",
+        marginRight: 8,
     },
-    metricLabel: {
-        fontSize: 11,
+    value: {
+        flexShrink: 0,
+        minWidth: 56,
+        textAlign: 'right',
+        fontSize: 13,
         fontWeight: "bold",
         color: "#000000",
+    },
+    emptyText: {
         textAlign: 'center',
-        width: '80%',
-    }
+        fontSize: 12,
+        color: '#666',
+        marginVertical: 10,
+    },
 });

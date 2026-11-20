@@ -16,7 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     ScrollView,
@@ -79,28 +79,32 @@ export default function TrackerScreen() {
     const { idOrden } = useLocalSearchParams();
 
     const [historial, setHistorial] = useState<MovimientoTracker[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(Boolean(idOrden));
 
     useEffect(() => {
-        if (idOrden) {
-            getHistorial(Number(idOrden));
-        } else {
-            setLoading(false);
-        }
-    }, [idOrden]);
+        if (!idOrden) return;
 
-    const getHistorial = async (id: number) => {
-        try {
-            setLoading(true);
-            const data = await apiFetch(`/api/ordenes/${id}/historial`);
-            setHistorial(data);
-        } catch (error) {
-            console.error("Error cargando historial: ", error);
-            setHistorial([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+        let cancelled = false;
+
+        const cargarHistorial = async () => {
+            try {
+                const data = await apiFetch(`/api/ordenes/${Number(idOrden)}/historial`);
+                if (!cancelled) setHistorial(data);
+            } catch (error) {
+                if (cancelled) return;
+                console.error("Error cargando historial: ", error);
+                setHistorial([]);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+
+        cargarHistorial();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [idOrden]);
 
     return (
         <View style={styles.container}>

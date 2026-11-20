@@ -1,62 +1,95 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+
+type IconColor = React.ComponentProps<typeof IconSymbol>['color'];
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const resolveTabColor = (color: unknown): IconColor =>
+  (color ?? '#8E8E93') as IconColor;
+
+function TabIcon({
+  sfName,
+  webName,
+  color,
+  size = 24,
+}: {
+  sfName: React.ComponentProps<typeof IconSymbol>['name'];
+  webName: IoniconName;
+  color: unknown;
+  size?: number;
+}) {
+  const resolvedColor = resolveTabColor(color);
+
+  if (Platform.OS === 'web') {
+    return <Ionicons name={webName} size={size} color={String(resolvedColor)} />;
+  }
+
+  return <IconSymbol size={size} name={sfName} color={resolvedColor} />;
+}
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
       }}>
 
-      {/* 1. Pestaña INICIO (antes era el 'index' default) */}
+      {/* 1. Pestaña INICIO */}
       <Tabs.Screen
-        name="dashboard" // <-- Debes crear el archivo dashboard.tsx
+        name="dashboard"
         options={{
           title: 'Inicio',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="square.grid.2x2.fill" color={color} />
+            <TabIcon sfName="square.grid.2x2.fill" webName="grid" color={color} />
           ),
         }}
       />
 
-      {/* 2. Pestaña COTIZACIONES (la que ya tenías) */}
+      {/* 2. Pestaña COTIZACIONES */}
       <Tabs.Screen
         name="cotizaciones"
         options={{
           title: 'Cotizaciones',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon sfName="doc.text.fill" webName="document-text" color={color} />
+          ),
         }}
       />
-      
+
       {/* 3. Pestaña ORDENES */}
       <Tabs.Screen
-        name="ordenes" // <-- Debes crear el archivo ordenes.tsx
+        name="ordenes"
         options={{
           title: 'Órdenes',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet.rectangle.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon sfName="list.bullet.rectangle.fill" webName="list" color={color} />
+          ),
         }}
       />
-      
+
       {/* 4. Pestaña ESTADÍSTICAS */}
       <Tabs.Screen
-        name="estadisticas" // <-- Debes crear el archivo estadisticas.tsx
+        name="estadisticas"
         options={{
           title: 'Estadísticas',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon sfName="chart.bar.fill" webName="bar-chart" color={color} />
+          ),
         }}
       />
-      
+
       {/* 5. Pestaña PERFIL */}
       <Tabs.Screen
-        name="perfil" // <-- Debes crear el archivo perfil.tsx
+        name="perfil"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon sfName="person.fill" webName="person" color={color} />
+          ),
         }}
       />
 

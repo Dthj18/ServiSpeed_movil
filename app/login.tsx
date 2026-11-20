@@ -3,7 +3,7 @@ import { saveSession } from '@/services/session';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -29,9 +29,11 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const gradientHeight = useRef(new Animated.Value(GRADIENT_HEIGHT_EXPANDED)).current;
+    const [gradientHeight] = useState(() => new Animated.Value(GRADIENT_HEIGHT_EXPANDED));
 
     useEffect(() => {
+        if (Platform.OS === 'web') return;
+
         const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
         const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
@@ -55,13 +57,23 @@ export default function LoginScreen() {
             showSub.remove();
             hideSub.remove();
         };
-    }, []);
+    }, [gradientHeight]);
+
+    const showAlert = (title: string, message: string) => {
+        if (Platform.OS === 'web') {
+            window.alert(`${title}: ${message}`);
+        } else {
+            Alert.alert(title, message);
+        }
+    };
 
     const handleLogin = async () => {
-        Keyboard.dismiss();
+        if (Platform.OS !== 'web') {
+            Keyboard.dismiss();
+        }
 
         if (!email || !password) {
-            Alert.alert('Error', 'Por favor ingresa correo y contraseña');
+            showAlert('Error', 'Por favor ingresa correo y contraseña');
             return;
         }
 
@@ -83,94 +95,102 @@ export default function LoginScreen() {
 
             router.replace('/(tabs)/dashboard');
         } catch (error: any) {
-            Alert.alert('Error de autenticación', error.body?.message || 'Correo o contraseña incorrectos');
+            showAlert('Error de autenticación', error.body?.message || 'Correo o contraseña incorrectos');
         } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            <View style={styles.root}>
-                <Stack.Screen options={{ headerShown: false }} />
+    const content = (
+        <View style={styles.root}>
+            <Stack.Screen options={{ headerShown: false }} />
 
-                <Animated.View style={{ height: gradientHeight }}>
-                    <LinearGradient
-                        colors={['#1E3A8A', '#3A88F6', '#60A5FA']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.gradient}
-                    >
-                        <SafeAreaView style={styles.safeArea} edges={['top']}>
-                            <View style={styles.logoWrap}>
-                                <Image
-                                    source={require('../assets/images/logo.png')}
-                                    resizeMode="contain"
-                                    style={styles.logo}
-                                />
-                            </View>
-                        </SafeAreaView>
-                    </LinearGradient>
-                </Animated.View>
-
-                <View style={styles.card}>
-                    <View
-                        style={styles.cardContent}>
-
-                        <View style={styles.dragIndicator} />
-
-                        <Text style={styles.title}>Bienvenido</Text>
-                        <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
-
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="mail" size={20} color="#3A88F6" style={styles.inputIcon} />
-                            <TextInput
-                                placeholder="Correo Electrónico"
-                                value={email}
-                                onChangeText={setEmail}
-                                style={styles.input}
-                                placeholderTextColor="#9CA3AF"
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                returnKeyType="next"
+            <Animated.View style={{ height: gradientHeight }}>
+                <LinearGradient
+                    colors={['#1E3A8A', '#3A88F6', '#60A5FA']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.gradient}
+                >
+                    <SafeAreaView style={styles.safeArea} edges={['top']}>
+                        <View style={styles.logoWrap}>
+                            <Image
+                                source={require('../assets/images/logo.png')}
+                                resizeMode="contain"
+                                style={styles.logo}
                             />
                         </View>
+                    </SafeAreaView>
+                </LinearGradient>
+            </Animated.View>
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="key" size={20} color="#3A88F6" style={styles.inputIcon} />
-                            <TextInput
-                                placeholder="Contraseña"
-                                value={password}
-                                onChangeText={setPassword}
-                                style={styles.input}
-                                placeholderTextColor="#9CA3AF"
-                                secureTextEntry
-                                returnKeyType="done"
-                                onSubmitEditing={handleLogin}
-                            />
-                        </View>
+            <View style={styles.card}>
+                <View style={styles.cardContent}>
 
-                        <Pressable
-                            onPress={handleLogin}
-                            disabled={loading}
-                            hitSlop={8}
-                            style={({ pressed }) => [
-                                styles.loginButton,
-                                pressed && styles.loginButtonPressed,
-                            ]}
-                        >
-                            {loading ? (
-                                <ActivityIndicator color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
-                            )}
-                        </Pressable>
+                    <View style={styles.dragIndicator} />
+
+                    <Text style={styles.title}>Bienvenido</Text>
+                    <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+
+                    <View style={styles.inputContainer}>
+                        <Ionicons name="mail" size={20} color="#3A88F6" style={styles.inputIcon} />
+                        <TextInput
+                            placeholder="Correo Electrónico"
+                            value={email}
+                            onChangeText={setEmail}
+                            style={styles.input}
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            returnKeyType="next"
+                        />
                     </View>
+
+                    <View style={styles.inputContainer}>
+                        <Ionicons name="key" size={20} color="#3A88F6" style={styles.inputIcon} />
+                        <TextInput
+                            placeholder="Contraseña"
+                            value={password}
+                            onChangeText={setPassword}
+                            style={styles.input}
+                            placeholderTextColor="#9CA3AF"
+                            secureTextEntry
+                            returnKeyType="done"
+                            onSubmitEditing={handleLogin}
+                        />
+                    </View>
+
+                    <Pressable
+                        onPress={handleLogin}
+                        disabled={loading}
+                        hitSlop={8}
+                        style={({ pressed }) => [
+                            styles.loginButton,
+                            pressed && styles.loginButtonPressed,
+                        ]}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#FFFFFF" />
+                        ) : (
+                            <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                        )}
+                    </Pressable>
                 </View>
             </View>
+        </View>
+    );
+
+    if (Platform.OS === 'web') {
+        return content;
+    }
+
+    return (
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            {content}
         </TouchableWithoutFeedback>
     );
 }
+
 const styles = StyleSheet.create({
     root: {
         flex: 1,
@@ -242,7 +262,7 @@ const styles = StyleSheet.create({
     },
     input: {
         color: "#1F2937",
-        fontSize: 15,
+        fontSize: 16,
         flex: 1,
         marginLeft: 10,
         height: '100%',

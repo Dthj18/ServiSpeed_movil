@@ -1,18 +1,32 @@
 import { apiFetch } from '@/services/apiClient';
+import { clearSession } from '@/services/session';
 import { faBell, faChevronRight, faCircleQuestion, faEnvelope, faLock, faRightFromBracket, faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
     ActivityIndicator, Alert,
     KeyboardAvoidingView,
+    Linking,
     Modal,
     Platform,
     ScrollView, StyleSheet,
     Switch, Text, TextInput, TouchableOpacity, View
 } from "react-native";
+
+const MenuOption = ({ icon, title, subtitle, onPress, showChevron = true, isDestructive = false }: any) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
+        <View style={[styles.iconBox, isDestructive && styles.iconBoxDestructive]}>
+            <FontAwesomeIcon icon={icon} size={20} color={isDestructive ? "#FE5F5F" : "#3A88F6"} />
+        </View>
+        <View style={styles.menuTextContainer}>
+            <Text style={[styles.menuTitle, isDestructive && styles.menuTitleDestructive]}>{title}</Text>
+            {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+        </View>
+        {showChevron && <FontAwesomeIcon icon={faChevronRight} size={14} color="#CCC" />}
+    </TouchableOpacity>
+);
 
 export default function PerfilScreen() {
     const router = useRouter();
@@ -30,6 +44,14 @@ export default function PerfilScreen() {
     const [passActual, setPassActual] = useState('');
     const [passNueva, setPassNueva] = useState('');
     const [passConfirmar, setPassConfirmar] = useState('');
+
+    const showAlert = (title: string, message: string) => {
+        if (Platform.OS === 'web') {
+            window.alert(`${title}: ${message}`);
+        } else {
+            Alert.alert(title, message);
+        }
+    };
 
     useFocusEffect(
         useCallback(() => {
@@ -68,7 +90,26 @@ export default function PerfilScreen() {
         }, [])
     );
 
+    const ejecutarLogout = async () => {
+        setLoadingLogout(true);
+        await clearSession();
+        await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userData');
+
+        setTimeout(() => {
+            setLoadingLogout(false);
+            router.replace('/login');
+        }, 500);
+    };
+
     const handleLogout = () => {
+        if (Platform.OS === 'web') {
+            if (window.confirm("¿Estás seguro que deseas cerrar sesión?")) {
+                ejecutarLogout();
+            }
+            return;
+        }
+
         Alert.alert(
             "Cerrar Sesión",
             "¿Estás seguro que deseas salir?",
@@ -77,16 +118,7 @@ export default function PerfilScreen() {
                 {
                     text: "Salir",
                     style: "destructive",
-                    onPress: async () => {
-                        setLoadingLogout(true);
-                        await AsyncStorage.removeItem('userToken');
-                        await AsyncStorage.removeItem('userData');
-
-                        setTimeout(() => {
-                            setLoadingLogout(false);
-                            router.replace('/login');
-                        }, 1000);
-                    }
+                    onPress: ejecutarLogout,
                 }
             ]
         );
@@ -94,18 +126,18 @@ export default function PerfilScreen() {
 
     const guardarPassword = async () => {
         if (!passActual || !passNueva || !passConfirmar) {
-            Alert.alert("Error", "Todos los campos son obligatorios");
+            showAlert("Error", "Todos los campos son obligatorios");
             return;
         }
         if (passNueva !== passConfirmar) {
-            Alert.alert("Error", "Las contraseñas nuevas no coinciden");
+            showAlert("Error", "Las contraseñas nuevas no coinciden");
             return;
         }
 
         try {
             const jsonUser = await AsyncStorage.getItem('userData');
             if (!jsonUser) {
-                Alert.alert("Error", "No se encontró sesión activa. Reingresa a la app.");
+                showAlert("Error", "No se encontró sesión activa. Reingresa a la app.");
                 return;
             }
 
@@ -119,7 +151,7 @@ export default function PerfilScreen() {
                 }
             });
 
-            Alert.alert("Éxito", "Tu contraseña ha sido actualizada correctamente");
+            showAlert("Éxito", "Tu contraseña ha sido actualizada correctamente");
             setModalPasswordVisible(false);
             setPassActual('');
             setPassNueva('');
@@ -129,25 +161,29 @@ export default function PerfilScreen() {
             const mensajeServidor = error.message || error.mensaje || error.data?.message || "";
 
             if (error.status === 400 || mensajeServidor.toLowerCase().includes("incorrecta")) {
-                Alert.alert("Contraseña Incorrecta", "La contraseña actual que ingresaste no es la correcta. Inténtalo de nuevo.");
+                showAlert("Contraseña Incorrecta", "La contraseña actual que ingresaste no es la correcta. Inténtalo de nuevo.");
             } else {
-                Alert.alert("Error", mensajeServidor || "No se pudo actualizar la contraseña. Revisa tu conexión.");
+                showAlert("Error", mensajeServidor || "No se pudo actualizar la contraseña. Revisa tu conexión.");
             }
         }
     };
 
-    const MenuOption = ({ icon, title, subtitle, onPress, showChevron = true, isDestructive = false }: any) => (
-        <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-            <View style={[styles.iconBox, isDestructive && styles.iconBoxDestructive]}>
-                <FontAwesomeIcon icon={icon} size={20} color={isDestructive ? "#FE5F5F" : "#3A88F6"} />
-            </View>
-            <View style={styles.menuTextContainer}>
-                <Text style={[styles.menuTitle, isDestructive && styles.menuTitleDestructive]}>{title}</Text>
-                {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
-            </View>
-            {showChevron && <FontAwesomeIcon icon={faChevronRight} size={14} color="#CCC" />}
-        </TouchableOpacity>
-    );
+    const contactarSoporte = () => {
+        const email = "diegothj57@gmail.com";
+        const subject = encodeURIComponent("Soporte App ServiSpeed");
+        const body = encodeURIComponent(
+            `Hola, necesito ayuda con la aplicación.\n\nMis datos:\nNombre: ${userData.nombre}\nRol: ${userData.rol}\n\nEscribe tu problema aquí: `
+        );
+
+        const url = `mailto:${email}?subject=${subject}&body=${body}`;
+
+        Linking.openURL(url).catch(() => {
+            showAlert(
+                "Error",
+                "No se pudo abrir ninguna aplicación de correo. Verifica que tengas una instalada."
+            );
+        });
+    };
 
     return (
         <>
@@ -223,7 +259,7 @@ export default function PerfilScreen() {
                         icon={faCircleQuestion}
                         title="Ayuda y Soporte"
                         subtitle="Contactar a sistemas"
-                        onPress={() => { }}
+                        onPress={contactarSoporte}
                     />
                 </View>
 
@@ -250,7 +286,6 @@ export default function PerfilScreen() {
                 visible={modalPasswordVisible}
                 onRequestClose={() => setModalPasswordVisible(false)}
             >
-                {/* KeyboardAvoidingView evita que el teclado de Android/iOS tape los inputs */}
                 <KeyboardAvoidingView
                     style={styles.modalOverlay}
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -448,4 +483,4 @@ const styles = StyleSheet.create({
     saveButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
     cancelButton: { padding: 15, alignItems: 'center' },
     cancelButtonText: { color: '#6B7280', fontWeight: '600', fontSize: 15 },
-}); 0  
+});
