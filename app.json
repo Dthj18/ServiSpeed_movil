@@ -7,9 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "servispeed",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      },
+      "bundleIdentifier": "com.anonymous.Servispeed"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,11 +23,12 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.Servispeed"
     },
     "web": {
-      "output": "static",
+      "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -38,11 +44,29 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-web-browser",
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b2d9281d-f61f-40ec-8111-d04cdb5cdb8f"
+      }
     }
   }
 }
