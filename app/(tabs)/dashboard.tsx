@@ -4,11 +4,9 @@ import { faArrowRight, faBell, faChartSimple, faClipboardList, faFileInvoiceDoll
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Dimensions, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const screenWidth = Dimensions.get("window").width;
 
 const COLOR_INGRESOS = '#20C997';
 const COLOR_EGRESOS = '#FF6B6B';
@@ -44,6 +42,9 @@ const BotonFiltro = ({ texto, activo, onPress }: { texto: string; activo: boolea
 );
 
 export default function DashboardScreen() {
+    const { width: screenWidth } = useWindowDimensions();
+    // 32 (padding scroll) + 40 (padding tarjeta) + 46 (eje Y) = 118
+    const chartWidth = Math.max(screenWidth - 118, 220);
 
     const [filtroTiempo, setFiltroTiempo] = useState('Semana');
     const [loading, setLoading] = useState(true);
@@ -114,28 +115,32 @@ export default function DashboardScreen() {
         }).format(numero);
     };
 
+    const barWidth = finanzas.datosGrafica.length <= 5 ? 14 : 10;
+
     const chartData = useMemo(() => {
         const result: any[] = [];
+        const groupSpacing = finanzas.datosGrafica.length <= 5 ? 22 : 12;
+
         finanzas.datosGrafica.forEach((item) => {
             result.push({
                 value: item.ingresos,
                 label: item.label,
                 spacing: 2,
-                labelWidth: 50, // ✨ Lo ampliamos para que "08:00" quepa holgadamente
+                labelWidth: 36,
                 labelTextStyle: {
                     color: '#6B7280',
                     fontSize: 10,
                     fontWeight: '500',
                     marginTop: 6,
                     textAlign: 'center',
-                    marginLeft: -8 // ✨ Magia matemática: empuja la caja a la izquierda para centrarla perfecto bajo las barras
+                    marginLeft: -6
                 },
                 frontColor: COLOR_INGRESOS,
                 tipo: 'Ingresos'
             });
             result.push({
                 value: item.egresos,
-                spacing: finanzas.datosGrafica.length <= 5 ? 30 : 15,
+                spacing: groupSpacing,
                 frontColor: COLOR_EGRESOS,
                 tipo: 'Egresos'
             });
@@ -244,7 +249,7 @@ export default function DashboardScreen() {
                                 <View style={styles.iconCircle}>
                                     <FontAwesomeIcon icon={faWallet as IconProp} size={18} color="#FFFFFF" />
                                 </View>
-                                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                                <Text style={[styles.cardValue, styles.cardValueMoney]} numberOfLines={1} adjustsFontSizeToFit>
                                     {formatoMoneda(resumen.pagoTotal)}
                                 </Text>
                             </View>
@@ -287,16 +292,18 @@ export default function DashboardScreen() {
                                 <BarChart
                                     key={JSON.stringify(chartData)}
                                     data={chartData}
+                                    width={chartWidth}
                                     maxValue={topeGrafica}
-                                    rulesLength={screenWidth - 70}
-                                    barWidth={16}
+                                    rulesLength={chartWidth}
+                                    barWidth={barWidth}
                                     barBorderTopLeftRadius={4}
                                     barBorderTopRightRadius={4}
-                                    initialSpacing={15}
+                                    initialSpacing={10}
+                                    endSpacing={10}
                                     yAxisThickness={0}
                                     xAxisThickness={0}
-                                    yAxisTextStyle={{ color: '#9CA3AF', fontSize: 11, textAlign: 'left' }}
-                                    yAxisLabelWidth={55}
+                                    yAxisTextStyle={{ color: '#9CA3AF', fontSize: 10, textAlign: 'left' }}
+                                    yAxisLabelWidth={46}
                                     formatYLabel={(label) => {
                                         const valor = Number(label);
                                         if (valor >= 1000) {
@@ -376,6 +383,10 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         fontFamily: "LexendTera-ExtraBold",
     },
+    cardValueMoney: {
+        fontSize: 12,
+        letterSpacing: -0.5,
+    },
     cardLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '500' },
     financeCard: {
         backgroundColor: '#FFFFFF',
@@ -393,16 +404,21 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         marginBottom: 25,
     },
-    financeTitleContainer: { flex: 1, marginRight: 15 },
+    financeTitleContainer: { flex: 1, marginRight: 8 },
     sectionTitle: { color: '#6B7280', fontSize: 13, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase' },
-    totalAmount: { color: '#111827', fontSize: 16, fontWeight: '800', fontFamily: "LexendTera-ExtraBold" },
-    periodSelector: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 4 },
-    periodButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
+    totalAmount: { color: '#111827', fontSize: 12, fontWeight: '800', fontFamily: "LexendTera-ExtraBold" },
+    periodSelector: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 8, padding: 3 },
+    periodButton: { paddingVertical: 6, paddingHorizontal: 9, borderRadius: 6 },
     periodButtonActive: { backgroundColor: '#FFFFFF', shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
     periodText: { color: '#6B7280', fontSize: 12, fontWeight: '600' },
     periodTextActive: { color: '#111827' },
-    chartWrapper: { alignItems: 'center', justifyContent: 'center' },
-    emptyChartContainer: { height: 220, justifyContent: 'center', alignItems: 'center' },
+    chartWrapper: {
+        width: '100%',
+        overflow: 'hidden',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+    },
+    emptyChartContainer: { height: 220, width: '100%', justifyContent: 'center', alignItems: 'center' },
     emptyChartText: { color: '#9CA3AF', fontSize: 14 },
     tooltipContainer: { backgroundColor: '#1F2937', padding: 8, borderRadius: 8, minWidth: 80, alignItems: 'center' },
     tooltipRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },

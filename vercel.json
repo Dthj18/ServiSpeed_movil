@@ -1,0 +1,16 @@
+{
+    "rewrites": [
+        {
+            "source": "/auth/:path*",
+            "destination": "http://74.208.127.250/auth/:path*"
+        },
+        {
+            "source": "/api/:path*",
+            "destination": "http://74.208.127.250/api/:path*"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}
